@@ -1,3 +1,5 @@
 .venv
 .devcontainer
 __pycache__
+reports/
+~WRL1120.tmp

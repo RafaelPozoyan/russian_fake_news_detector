@@ -158,7 +158,7 @@ def load_model():
 model_randfor_tf, model_naibayes_tf, model_logreg_tf, vectorizer_tf, model_loaded = load_model()
 stopwords_list = load_stopwords()
 
-# Функции признаков
+# Функции признаков 
 def doc_vector(tokens, kv_model):
     vecs = [kv_model[w] for w in tokens if w in kv_model]
 
@@ -628,11 +628,13 @@ st.markdown("---")
 but1, but2 = st.columns(2)
 
 with but1:
-    if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", type="secondary", use_container_width=True):
+    if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", 
+                 type="secondary", use_container_width=True):
         st.switch_page("pages/info.py")
 with but2:
-    if st.button("В работе...", help="Тестовая кнопка", type="secondary", use_container_width=True, disabled=True):
-        st.switch_page("pages/info.py")
+    if st.button("Детектор с расширенным датасетм", help="Перевод с русского на английского. Проверяется, как это влияет на уровень детекции",
+                 type="secondary", use_container_width=True):
+        st.switch_page("pages/eng.py")
 
 
 
