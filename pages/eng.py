@@ -92,7 +92,7 @@ def set_styles():
 
 set_styles()
 
-if st.button("←"):
+if st.button("←", help="Вернуться на главную страницу", type="secondary"):
     st.switch_page("app.py")
 
 @st.cache_data
@@ -170,8 +170,19 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='color: #FFFFE0;'>
+            <h3 style='color: #FFFFE0;'>Способ решения проблемы</h3>
+            <p>На данной странице модели обучены на датасете на английском языке.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-st.title("Прдсказание с использованием английского датасета", anchor=None)
+
+st.title("Предсказание с использованием английского датасета", anchor=None)
 
 with st.expander("Как пользоваться?", expanded=False):
     st.markdown("""<div style='color:#FFFFE0;'>
@@ -286,113 +297,64 @@ if check_button:
 
                 col1, col2, col3 = st.columns(3)
 
-                # random forest
-                with col3:
-                    if prediction_rf == 1:
-                        # Реальная новость
-                        confidence = probabilities_rf[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["random_forest"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_rf[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["random_forest"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                results = [
+                    {
+                        "col": col3,
+                        "name": "Random Forest",
+                        "prediction": prediction_rf,
+                        "probabilities": probabilities_rf,
+                        "metric_key": "random_forest",
+                        "metrics": metrics,
+                    },
+                    {
+                        "col": col2,
+                        "name": "Naive Bayes",
+                        "prediction": prediction_nb,
+                        "probabilities": probabilities_nb,
+                        "metric_key": "naive_bayes",
+                        "metrics": metrics,
+                    },
+                    {
+                        "col": col1,
+                        "name": "Logistic Regression",
+                        "prediction": prediction_lr,
+                        "probabilities": probabilities_lr,
+                        "metric_key": "logistic_regression",
+                        "metrics": metrics,
+                    },
+                ]
 
-                # naive bayes
-                with col2:
-                    if prediction_nb == 1:
-                        # Реальная новость
-                        confidence = probabilities_nb[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Naive Bayes</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["naive_bayes"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )                        
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_nb[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Naive Bayes</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["naive_bayes"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                for res in results:
+                    with res["col"]:
+                        if res["prediction"] == 1:
+                            confidence = res["probabilities"][1] * 100
+                            st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value'>{confidence:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )         
+                        else:
+                            confidence = res["probabilities"][0] * 100
+                            st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                # logistic regression
-                with col1:
-                    if prediction_lr == 1:
-                        # Реальная новость
-                        confidence = probabilities_lr[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["logistic_regression"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_lr[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["logistic_regression"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
 
                 # st.markdown("---")
                 # st.markdown("### Усредненный ответ")
@@ -410,7 +372,15 @@ if check_button:
             # except Exception as e:
             #     st.error(f'❌ Ошибка: {str(e)}')
 
-
 st.markdown("---")
-if st.button("Вернуться на главную страницу", use_container_width=True, type="secondary"):
-    st.switch_page("app.py")
+
+but1, but2 = st.columns(2)
+
+with but1:
+    if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", 
+                 type="secondary", use_container_width=True):
+        st.switch_page("pages/info.py")
+with but2:
+    if st.button("Вернуться на главную страницу", help="Вернуться на страницу с использованием русского датасета", 
+                 type="secondary", use_container_width=True):
+        st.switch_page("app.py")

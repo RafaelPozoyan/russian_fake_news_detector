@@ -285,6 +285,17 @@ with st.sidebar:
     )
 
     st.markdown("---")
+    st.markdown(
+        """
+        <div style='color: #FFFFE0;'>
+            <h3 style='color: #FFFFE0;'>Способ решения проблемы</h3>
+            <p>На данной странице модели обучены на датасете на русском языке.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
     
     if kv is not None:
         st.markdown("<div style='color:#FFFFE0;'><h4>Статус Word2Vec:</h4><p>Модели и эмбеддинги загружены</p></div>", unsafe_allow_html=True)
@@ -401,73 +412,58 @@ if check_button:
                 st.markdown("### Word2Vec")
                 col1, col2 = st.columns(2)
 
-                # Logistic Regression
-                with col1:
-                    if final_label_lr == 1:
-                        st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{prob_lr[1]*100:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics_w2v["logisticregression"]["val_accuracy"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                results = [
+                    {
+                        "col": col1,
+                        "name": "Logistic Regression",
+                        "final_label": final_label_lr,
+                        "prob": prob_lr[1],
+                        "accuracy": metrics_w2v["logisticregression"]["val_accuracy"],
+                        "reasons": reasons_lr,
+                    },
+                    {
+                        "col": col2,
+                        "name": "Random Forest",
+                        "final_label": final_label_rf,
+                        "prob": prob_rf[1],
+                        "accuracy": metrics_w2v["randomforest"]["val_accuracy"],
+                        "reasons": reasons_rf,
+                    }
+                ]
 
-                    else:
-                        st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{(1-prob_lr[1])*100:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics_w2v["logisticregression"]["val_accuracy"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        if reasons_lr:
-                            with st.expander("Почему сработали бизнес-правила?"):
-                                for r in reasons_lr:
-                                    st.write(f"- {r}")
+                for res in results:
+                    with res["col"]:
+                        if res["final_label"] == 1:
+                            st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value'>{res['prob']*100:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value' style='color: #b91c1c;'>{(1-res['prob'])*100:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            if res["reasons"]:
+                                with st.expander("Почему сработали бизнес-правила?"):
+                                    for r in res["reasons"]:
+                                        st.write(f"- {r}")
 
-                # Random Forest
-                with col2:
-                    if final_label_rf == 1:
-                        st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{prob_rf[1]*100:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics_w2v["randomforest"]["val_accuracy"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )                      
-                        
-                    else:
-                        st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{(1-prob_rf[1])*100:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics_w2v["randomforest"]["val_accuracy"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        if reasons_rf:
-                            with st.expander("Почему сработали бизнес-правила?"):
-                                for r in reasons_rf:
-                                    st.write(f"- {r}")
 
 
                 # =================================
@@ -499,113 +495,63 @@ if check_button:
 
                 col1, col2, col3 = st.columns(3)
 
-                # random forest
-                with col3:
-                    if prediction_rf == 1:
-                        # Реальная новость
-                        confidence = probabilities_rf[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["random_forest"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_rf[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Random Forest</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["random_forest"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                results = [
+                    {
+                        "col": col3,
+                        "name": "Random Forest",
+                        "prediction": prediction_rf,
+                        "probabilities": probabilities_rf,
+                        "metric_key": "random_forest",
+                        "metrics": metrics,
+                    },
+                    {
+                        "col": col2,
+                        "name": "Naive Bayes",
+                        "prediction": prediction_nb,
+                        "probabilities": probabilities_nb,
+                        "metric_key": "naive_bayes",
+                        "metrics": metrics,
+                    },
+                    {
+                        "col": col1,
+                        "name": "Logistic Regression",
+                        "prediction": prediction_lr,
+                        "probabilities": probabilities_lr,
+                        "metric_key": "logistic_regression",
+                        "metrics": metrics,
+                    },
+                ]
 
-                # naive bayes
-                with col2:
-                    if prediction_nb == 1:
-                        # Реальная новость
-                        confidence = probabilities_nb[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Naive Bayes</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["naive_bayes"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )                        
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_nb[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Naive Bayes</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["naive_bayes"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                # logistic regression
-                with col1:
-                    if prediction_lr == 1:
-                        # Реальная новость
-                        confidence = probabilities_lr[1] * 100
-                        st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["logistic_regression"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        
-                    else:
-                        # Фейковая новость
-                        confidence = probabilities_lr[0] * 100
-                        st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                        
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>Logistic Regression</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                <div class='metric-label'><strong>Accuracy:</strong> {metrics["logistic_regression"]["val_acc"]:.3f}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                for res in results:
+                    with res["col"]:
+                        if res["prediction"] == 1:
+                            confidence = res["probabilities"][1] * 100
+                            st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value'>{confidence:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )         
+                        else:
+                            confidence = res["probabilities"][0] * 100
+                            st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
                 st.markdown("---")
                 st.markdown("### Усредненный ответ")
@@ -632,7 +578,7 @@ with but1:
                  type="secondary", use_container_width=True):
         st.switch_page("pages/info.py")
 with but2:
-    if st.button("Детектор с расширенным датасетм", help="Перевод с русского на английского. Проверяется, как это влияет на уровень детекции",
+    if st.button("Детектор с датасетом на английском языке", help="Перевод с русского на английского. Проверяется, как это влияет на уровень детекции",
                  type="secondary", use_container_width=True):
         st.switch_page("pages/eng.py")
 
