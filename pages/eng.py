@@ -13,6 +13,9 @@ import random
 import pandas as pd
 
 
+with open("results/metrics/metrics_w2v_eng.json", "r", encoding="utf-8") as f:
+    metrics_w2v = json.load(f)
+
 st.set_page_config(page_title="Детектор с английским датасетом", page_icon="🔍", layout="wide")
 
 def set_styles():
@@ -123,23 +126,29 @@ def translate_to_en(text):
     except Exception as e:
         return text 
 
+##################################################
+##############################################TEST
+# Загрузка артефактов
+@st.cache_resource
+def load_artifacts():
+    clf = None; kv = None; metrics = None
 
-# @st.cache_resource
-# def load_artifacts():
-#     clf = None; kv = None; metrics = None
+    if os.path.exists("models/fake_news_w2v_lr.pkl"):
+        with open("models/fake_news_w2v_lr.pkl", "rb") as f:
+            clf = pickle.load(f)
 
-#     if os.path.exists("models/fake_news_w2v_lr.pkl"):
-#         with open("models/fake_news_w2v_lr.pkl", "rb") as f:
-#             clf = pickle.load(f)
+    if os.path.exists("models/w2v_vectors_eng.kv"):
+        kv = KeyedVectors.load("models/w2v_vectors_eng.kv")
 
-#     if os.path.exists("models/w2v_vectors.kv"):
-#         kv = KeyedVectors.load("models/w2v_vectors.kv")
-
-#     if os.path.exists("models/metrics.pkl"):
-#         with open("models/metrics.pkl", "rb") as f:
-#             metrics = pickle.load(f)
+    if os.path.exists("models/metrics.pkl"):
+        with open("models/metrics.pkl", "rb") as f:
+            metrics = pickle.load(f)
     
-#     return clf, kv, metrics
+    return clf, kv, metrics
+
+clf, kv, train_metrics = load_artifacts()
+##############################################TEST
+##################################################
 
 
 def load_model():
@@ -152,6 +161,117 @@ def load_model():
         return model_randfor_tf, model_naibayes_tf, model_logreg_tf, vectorizer_tf, True
     except FileNotFoundError:
         return None, None, None, None, False
+
+##############################################TEST
+##################################################
+# Функции признаков 
+def doc_vector(tokens, kv_model):
+    vecs = [kv_model[w] for w in tokens if w in kv_model]
+
+    if not vecs:
+        return np.zeros(kv_model.vector_size, dtype=np.float32)
+    
+    return np.vstack(vecs).mean(axis=0)
+
+def cosine(u, v):
+    nu, nv = np.linalg.norm(u), np.linalg.norm(v)
+
+    if nu == 0 or nv == 0:
+        return 0.0
+    
+    return float(np.dot(u, v) / (nu * nv))
+
+def jaccard(a_tokens, b_tokens):
+    A, B = set(a_tokens), set(b_tokens)
+
+    if not A and not B:
+        return 0.0
+    
+    return len(A & B) / max(1, len(A | B))
+
+def overlap_ratio(a_tokens, b_tokens):
+    A, B = set(a_tokens), set(b_tokens)
+    
+    return 0.0 if not A else len(A & B) / len(A)
+
+def build_feature_vector(headline_clean, body_clean, kv_model, max_len=150):
+    htoks = headline_clean.split()[:max_len]
+    btoks = body_clean.split()[:max_len]
+
+    h_vec = doc_vector(htoks, kv_model)
+    b_vec = doc_vector(btoks, kv_model)
+
+    cos_sim = cosine(h_vec, b_vec)
+    jacc = jaccard(htoks, btoks)
+    ovr = overlap_ratio(htoks, btoks)
+    l2 = np.linalg.norm(h_vec - b_vec)
+
+    feats = np.hstack([h_vec, b_vec, [cos_sim]])
+    return feats, {"cosine": cos_sim, "jaccard": jacc, "overlap": ovr, "l2": l2}
+
+def predict(headline_raw, body_raw, clf_model, kv_model):
+    headline_clean = preprocess_text(headline_raw, STOPWORDS)
+    body_clean = preprocess_text(body_raw, STOPWORDS)
+    
+    if len(headline_clean) < 2 or len(body_clean) < 5:
+        return None, None, headline_clean, body_clean, None
+    
+    X, rel = build_feature_vector(headline_clean, body_clean, kv_model)
+    X = X.reshape(1, -1)
+    
+    prob = clf_model.predict_proba(X)[0]
+    pred = int(clf_model.predict(X)[0])
+    
+    return pred, prob, headline_clean, body_clean, rel
+
+# Фиксированные пороги и правила
+DEFAULT_THRESHOLDS = {
+    "proba_real": 0.55,   
+    "cos_min": 0.20,      
+    "jacc_min": 0.005,     
+    "overlap_min": 0.10,  
+    "l2_max": 14.0,       
+}
+HARD_RULES = {
+    "very_low_cos": 0.10,
+    "zero_overlap": 0.00,
+}
+
+def decide_with_rules(prob_real, rel, thresholds=DEFAULT_THRESHOLDS, hard_rules=HARD_RULES):
+    reasons = []
+
+    if rel["cosine"] < hard_rules["very_low_cos"]:
+        reasons.append(f"Низкая косинусная близость (cosine): {rel['cosine']:.3f}")
+        return 0, reasons
+    
+    if rel["overlap"] <= hard_rules["zero_overlap"]:
+        reasons.append("В заголовке нет слов, встречающихся в тексте (overlap=0)")
+        return 0, reasons
+
+    soft_ok = True
+    if rel["cosine"] < thresholds["cos_min"]:
+        soft_ok = False; reasons.append(f"cosine ниже порога ({rel['cosine']:.3f} < {thresholds['cos_min']})")
+    
+    if rel["jaccard"] < thresholds["jacc_min"]:
+        soft_ok = False; reasons.append(f"Jaccard ниже порога ({rel['jaccard']:.3f} < {thresholds['jacc_min']})")
+    
+    if rel["overlap"] < thresholds["overlap_min"]:
+        soft_ok = False; reasons.append(f"overlap ниже порога ({rel['overlap']:.3f} < {thresholds['overlap_min']})")
+    
+    if rel["l2"] > thresholds["l2_max"]:
+        soft_ok = False; reasons.append(f"L2 выше порога ({rel['l2']:.3f} > {thresholds['l2_max']})")
+
+    if prob_real >= thresholds["proba_real"] and soft_ok:
+        return 1, reasons
+    else:
+    
+        if prob_real >= thresholds["proba_real"]:
+            reasons.append(f"Вероятность модели высокая ({prob_real*100:.1f}%), но связи между заголовком и текстом нет")
+    
+        return 0, reasons
+    
+##############################################TEST
+##################################################
 
 with st.sidebar:
     logo = Image.open('assets/logo.png')
@@ -201,6 +321,9 @@ test_df = test_stances.merge(test_bodies, on='Body ID', how='left')
 with open("results/metrics/metrics_tfidf_eng.json", "r", encoding="utf-8") as f:
     metrics = json.load(f)
 
+with open("results/metrics/metrics_w2v_eng.json", "r", encoding="utf-8") as f:
+    metrics_w2v = json.load(f)
+
 def pick_news():
     idx = random.randint(0, len(test_df)-1)
     st.session_state.headline = test_df.loc[idx, "Headline1"]
@@ -249,6 +372,80 @@ if check_button:
         st.warning('⚠️ Пожалуйста, заполните заголовок и текст новости')
     else:
         with st.spinner('🔄 Перевожу новость на нужный язык...'):
+                
+                with open("models/logisticregression_model_w2v_eng.pkl", "rb") as f:
+                    clf_lr = pickle.load(f)
+                with open("models/randomforest_model_w2v_eng.pkl", "rb") as f:
+                    clf_rf = pickle.load(f)
+
+                headline = translate_to_en(headline)
+                body = translate_to_en(body)
+
+                # prediction для каждой модели
+                pred_lr, prob_lr, h_clean, b_clean, rel_lr = predict(headline, body, clf_lr, kv)
+                pred_rf, prob_rf, _, _, rel_rf = predict(headline, body, clf_rf, kv)
+
+                # Проверка бизнес-правил
+                final_label_lr, reasons_lr = decide_with_rules(prob_lr[1], rel_lr)
+                final_label_rf, reasons_rf = decide_with_rules(prob_rf[1], rel_rf)
+                
+                # =================================
+                # Вывод результатов работы Word2Vec
+                # =================================
+                st.markdown("### Word2Vec")
+                col1, col2 = st.columns(2)
+
+                results = [
+                    {
+                        "col": col1,
+                        "name": "Logistic Regression",
+                        "final_label": final_label_lr,
+                        "prob": prob_lr[1],
+                        "accuracy": metrics_w2v["logisticregression"]["val_accuracy"],
+                        "reasons": reasons_lr,
+                    },
+                    {
+                        "col": col2,
+                        "name": "Random Forest",
+                        "final_label": final_label_rf,
+                        "prob": prob_rf[1],
+                        "accuracy": metrics_w2v["randomforest"]["val_accuracy"],
+                        "reasons": reasons_rf,
+                    }
+                ]
+
+                for res in results:
+                    with res["col"]:
+                        if res["final_label"] == 1:
+                            st.success('✅ **РЕАЛЬНАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value'>{res['prob']*100:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.error('❌ **ФЕЙКОВАЯ НОВОСТЬ**')
+                            st.markdown(
+                                f"""
+                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
+                                    <div class='metric-label'>{res['name']}</div>
+                                    <div class='metric-label'>Уверенность</div>
+                                    <div class='metric-value' style='color: #b91c1c;'>{(1-res['prob'])*100:.1f}%</div>
+                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            if res["reasons"]:
+                                with st.expander("Почему сработали бизнес-правила?"):
+                                    for r in res["reasons"]:
+                                        st.write(f"- {r}")
 
                 # =================================
                 # Вывод результатов TF-IDF
@@ -276,19 +473,7 @@ if check_button:
 
                 # предикты на logistic regression
                 prediction_lr = model_logreg_tf.predict(text_vec)[0]
-                probabilities_lr = model_logreg_tf.predict_proba(text_vec)[0]  
-
-
-                with st.expander("Как выглядит переведенный текст?", expanded=False):
-                    st.markdown("""<div style='color:#FFFFE0;'>
-                    Переведенный заголовок
-                    </div>""", unsafe_allow_html=True)
-                    headline
-
-                    st.markdown("""<div style='color:#FFFFE0;'>
-                    Переведенный текст новости
-                    </div>""", unsafe_allow_html=True)
-                    body
+                probabilities_lr = model_logreg_tf.predict_proba(text_vec)[0]
 
 
                 st.markdown('---')
@@ -355,22 +540,18 @@ if check_button:
                                 unsafe_allow_html=True
                             )
 
+                st.markdown('---')
+                  
+                with st.expander("Как выглядит переведенный текст?", expanded=False):
+                    st.markdown("""<div style='color:#FFFFE0;'>
+                    Переведенный заголовок
+                    </div>""", unsafe_allow_html=True)
+                    headline
 
-                # st.markdown("---")
-                # st.markdown("### Усредненный ответ")
-                # sum_1 = final_label_rf + final_label_rf + prediction_lr + prediction_nb + prediction_rf
-                # if sum_1 >= 3:
-                #     st.success(f'✅ **РЕАЛЬНАЯ НОВОСТЬ**')
-
-                #     st.markdown("Количество предиктов на то, что новость реальная больше.")
-                # else:
-                #     st.error(f'❌ **ФЕЙКОВАЯ НОВОСТЬ**')
-                #     st.markdown("Количество предиктов на то, что новость фейковая больше.")
-                
-
-
-            # except Exception as e:
-            #     st.error(f'❌ Ошибка: {str(e)}')
+                    st.markdown("""<div style='color:#FFFFE0;'>
+                    Переведенный текст новости
+                    </div>""", unsafe_allow_html=True)
+                    body
 
 st.markdown("---")
 
