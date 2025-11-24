@@ -205,8 +205,11 @@ def build_feature_vector(headline_clean, body_clean, kv_model, max_len=150):
     jacc = jaccard(htoks, btoks)
     ovr = overlap_ratio(htoks, btoks)
     l2 = np.linalg.norm(h_vec - b_vec)
-
+    
+    # Для английского датасета используем только H, B и COS (как при обучении)
+    # Это дает 300 + 300 + 1 = 601 признак
     feats = np.hstack([h_vec, b_vec, [cos_sim]])
+    
     return feats, {"cosine": cos_sim, "jaccard": jacc, "overlap": ovr, "l2": l2}
 
 def predict(headline_raw, body_raw, clf_model, kv_model):
@@ -321,9 +324,6 @@ test_df = test_stances.merge(test_bodies, on='Body ID', how='left')
 with open("results/metrics/metrics_tfidf_eng.json", "r", encoding="utf-8") as f:
     metrics = json.load(f)
 
-with open("results/metrics/metrics_w2v_eng.json", "r", encoding="utf-8") as f:
-    metrics_w2v = json.load(f)
-
 def pick_news():
     idx = random.randint(0, len(test_df)-1)
     st.session_state.headline = test_df.loc[idx, "Headline1"]
@@ -377,9 +377,6 @@ if check_button:
                     clf_lr = pickle.load(f)
                 with open("models/randomforest_model_w2v_eng.pkl", "rb") as f:
                     clf_rf = pickle.load(f)
-
-                headline = translate_to_en(headline)
-                body = translate_to_en(body)
 
                 # prediction для каждой модели
                 pred_lr, prob_lr, h_clean, b_clean, rel_lr = predict(headline, body, clf_lr, kv)
@@ -473,7 +470,19 @@ if check_button:
 
                 # предикты на logistic regression
                 prediction_lr = model_logreg_tf.predict(text_vec)[0]
-                probabilities_lr = model_logreg_tf.predict_proba(text_vec)[0]
+                probabilities_lr = model_logreg_tf.predict_proba(text_vec)[0]  
+
+
+                with st.expander("Как выглядит переведенный текст?", expanded=False):
+                    st.markdown("""<div style='color:#FFFFE0;'>
+                    Переведенный заголовок
+                    </div>""", unsafe_allow_html=True)
+                    headline
+
+                    st.markdown("""<div style='color:#FFFFE0;'>
+                    Переведенный текст новости
+                    </div>""", unsafe_allow_html=True)
+                    body
 
 
                 st.markdown('---')
@@ -540,18 +549,6 @@ if check_button:
                                 unsafe_allow_html=True
                             )
 
-                st.markdown('---')
-                  
-                with st.expander("Как выглядит переведенный текст?", expanded=False):
-                    st.markdown("""<div style='color:#FFFFE0;'>
-                    Переведенный заголовок
-                    </div>""", unsafe_allow_html=True)
-                    headline
-
-                    st.markdown("""<div style='color:#FFFFE0;'>
-                    Переведенный текст новости
-                    </div>""", unsafe_allow_html=True)
-                    body
 
 st.markdown("---")
 
@@ -560,7 +557,7 @@ but1, but2 = st.columns(2)
 with but1:
     if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", 
                  type="secondary", use_container_width=True):
-        st.switch_page("pages/info.py")
+        st.switch_page("pages/info_eng.py")
 with but2:
     if st.button("Вернуться на главную страницу", help="Вернуться на страницу с использованием русского датасета", 
                  type="secondary", use_container_width=True):
