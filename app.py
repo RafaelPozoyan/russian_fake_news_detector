@@ -22,7 +22,7 @@ with open("results/metrics/metrics_w2v.json", "r", encoding="utf-8") as f:
 with open("results/metrics/metrics_tfidf_tuned.json", "r", encoding="utf-8") as f:
     metrics = json.load(f)
 
-st.set_page_config(page_title="Детектор фейковых новостей", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="Детектор фейковых новостей ", page_icon="🔍", layout="wide")
 
 def set_styles():
     st.markdown("""
