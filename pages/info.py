@@ -121,11 +121,5 @@ st.image("assets/models_scores_w2v.png")
 
 st.markdown("---")
 
-but1, but2 = st.columns(2)
-
-with but1:
-    if st.button("Перейти на страницу с использованием русского датасета", use_container_width=True):
-        st.switch_page("app.py")
-with but2:
-    if st.button("Перейти на страницу с использованием английского датасета", use_container_width=True):
-        st.switch_page("pages/eng.py")
+if st.button("Перейти на страницу с использованием русского датасета", use_container_width=True):
+    st.switch_page("app.py")

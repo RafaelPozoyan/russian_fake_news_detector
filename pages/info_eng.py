@@ -209,14 +209,7 @@ with st.expander("Параметры Word2Vec модели"):
 
 st.markdown("---")
 
-but1, but2 = st.columns(2)
-
-with but1:
-    if st.button("Перейти на страницу с использованием английского датасета", help="Перейти на предыдущую страницу",
-    type="secondary", use_container_width=True):
-        st.switch_page("pages/eng.py")
-with but2:
-    if st.button("Перейти на страницу с использованием русского датасета", help="Вернуться на главную страницу",
-    type="secondary", use_container_width=True):
-        st.switch_page("app.py")
+if st.button("Перейти на страницу с использованием английского датасета", help="Перейти на предыдущую страницу",
+type="secondary", use_container_width=True):
+    st.switch_page("pages/eng.py")
 

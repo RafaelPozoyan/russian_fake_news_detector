@@ -306,6 +306,7 @@ with st.sidebar:
 
 
 st.title("Предсказание с использованием английского датасета", anchor=None)
+st.info('Используются модели, обученные на английском датасете')
 
 with st.expander("Как пользоваться?", expanded=False):
     st.markdown("""<div style='color:#FFFFE0;'>
@@ -552,13 +553,14 @@ if check_button:
 
 st.markdown("---")
 
-but1, but2 = st.columns(2)
 
-with but1:
-    if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", 
-                 type="secondary", use_container_width=True):
-        st.switch_page("pages/info_eng.py")
-with but2:
-    if st.button("Вернуться на главную страницу", help="Вернуться на страницу с использованием русского датасета", 
-                 type="secondary", use_container_width=True):
-        st.switch_page("app.py")
+if st.button("Обзор подходов", help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов", 
+                type="secondary", use_container_width=True):
+    st.switch_page("pages/info_eng.py")
+
+if st.button("Сравнение двух методов", help="Сравнивается работа русских и английских моделей", 
+                type="secondary", use_container_width=True):
+    st.switch_page("pages/comparsion.py")
+
+if st.button("Детектор с датасетом на русском языке", type="secondary", use_container_width=True):
+    st.switch_page("app.py")
