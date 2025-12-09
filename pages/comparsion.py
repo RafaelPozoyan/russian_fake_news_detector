@@ -108,14 +108,37 @@ st.image('assets/Logistic Regression_tfidf_comparison.png')
 st.image('assets/Naive Bayes_tfidf_comparison.png')
 st.image('assets/Random Forest_tfidf_comparison.png')
 
-st.markdown("---")
-
 st.markdown(
     """
 - Можем сделать вывод, что использование моделей, обученных на английском языке, дает менее точные результаты, несмотря на то, что тренировочный датасет
 в 3 раза больше, чем у моделей на русском языке.
 - Наилучший результат среди англоязычных моделей показал **Naive Bayes**
 - Русскозычные модели показали большую точность, в некоторых случаях угадывая 100% предложенных новостей.
+""",
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
+
+st.markdown(
+    """
+Ниже будут показаны результаты сравнения работы моделей, обученных через Word2Vec
+""",
+    unsafe_allow_html=True
+)
+st.image('assets/randomforest_w2v_comparison.png')
+st.image('assets/logisticregression_w2v_comparison.png')
+st.markdown(
+    """
+Несмотря на то, что модели на английском датасете выдают лучшие результаты, чем до этого, они все равно не превосходят модели, обученные на русском.
+""",
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
+st.markdown(
+    """
+Можно прийти к выводу, что модели, обученные на русском датасете в любом случае превосходят вариант с переводом данных.
 """,
     unsafe_allow_html=True
 )
