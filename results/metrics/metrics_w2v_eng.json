@@ -1,22 +1,22 @@
 {
     "logisticregression": {
-        "val_accuracy": 0.9902930744819862,
-        "val_f1": 0.9902902588921146,
+        "val_accuracy": 0.9919731192831809,
+        "val_f1": 0.991971180727108,
         "best_params": {
-            "C": 2,
+            "C": 5,
             "class_weight": null,
             "max_iter": 500,
             "solver": "liblinear"
         }
     },
     "randomforest": {
-        "val_accuracy": 0.9839462385663618,
-        "val_f1": 0.9839508469776903,
+        "val_accuracy": 0.9830128803434758,
+        "val_f1": 0.9830185644658159,
         "best_params": {
             "class_weight": "balanced",
-            "max_depth": 30,
-            "min_samples_split": 2,
-            "n_estimators": 200
+            "max_depth": 20,
+            "min_samples_split": 5,
+            "n_estimators": 300
         }
     }
 }
