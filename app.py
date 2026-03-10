@@ -11,6 +11,9 @@ import random
 import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
 
 test_bodies = pd.read_csv("./data/test_bodies.csv")
 test_stances = pd.read_csv("./data/test_stances_unlebeledb.csv")
@@ -22,6 +25,46 @@ with open("results/metrics/metrics_w2v.json", "r", encoding="utf-8") as f:
     metrics_w2v = json.load(f)
 with open("results/metrics/metrics_tfidf_tuned.json", "r", encoding="utf-8") as f:
     metrics = json.load(f)
+RUBERT_MODEL_DIR = "models/rubert/best_model"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+@st.cache_resource
+def load_rubert_model(model_dir=RUBERT_MODEL_DIR):
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(DEVICE)
+    model.eval()
+    return tokenizer, model
+
+@torch.no_grad()
+def predict_rubert(text, tokenizer, model, max_length=256):
+    text = str(text).strip()
+
+    encoded = tokenizer(
+        text,
+        truncation=True,
+        padding="max_length",
+        max_length=max_length,
+        return_tensors="pt"
+    )
+
+    input_ids = encoded["input_ids"].to(DEVICE)
+    attention_mask = encoded["attention_mask"].to(DEVICE)
+
+    outputs = model(
+        input_ids=input_ids,
+        attention_mask=attention_mask
+    )
+
+    probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()[0]
+    pred = int(np.argmax(probs))
+
+    return {
+        "label": pred,
+        "label_name": "Правдивая" if pred == 1 else "Фейковая",
+        "fake_proba": float(probs[0]),
+        "real_proba": float(probs[1])
+    }
+
 
 st.set_page_config(
     page_title="Детектор фейковых новостей ", page_icon="🔍", layout="wide"
@@ -364,6 +407,18 @@ with st.sidebar:
 
     st.markdown("---")
 
+    rubert_status = os.path.exists(RUBERT_MODEL_DIR)
+    if rubert_status:
+        st.markdown(
+            "<div style='color:#FFFFE0;'><h4>Статус RuBERT:</h4><p>Модель загружена</p></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<div style='color:#FFFFE0;'><h4>Статус RuBERT:</h4><p>Нет модели в models/rubert/best_model</p></div>",
+            unsafe_allow_html=True,
+        )
+
 # Главный контент
 st.title("Детектор фейковых новостей")
 st.info("Используются модели, обученные на русском датасете")
@@ -633,17 +688,65 @@ if check_button:
                                 """,
                                 unsafe_allow_html=True,
                             )
+                
+
+                # =================================
+                # Вывод результатов RuBERT
+                # =================================
+                rubert_pred_label = None
+
+                if os.path.exists(RUBERT_MODEL_DIR):
+                    st.markdown("### RuBERT")
+
+                    tokenizer_rb, model_rb = load_rubert_model()
+                    combined_for_rubert = f"{headline} {body}"
+                    rubert_result = predict_rubert(combined_for_rubert, tokenizer_rb, model_rb)
+
+                    rubert_pred_label = rubert_result["label"]
+
+                    if rubert_pred_label == 1:
+                        st.success("✅ **РЕАЛЬНАЯ НОВОСТЬ**")
+                        st.markdown(
+                            f"""
+                            <div class='metric-container'>
+                                <div class='metric-label'>RuBERT</div>
+                                <div class='metric-label'>Уверенность</div>
+                                <div class='metric-value'>{rubert_result['real_proba']*100:.1f}%</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.error("❌ **ФЕЙКОВАЯ НОВОСТЬ**")
+                        st.markdown(
+                            f"""
+                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
+                                <div class='metric-label'>RuBERT</div>
+                                <div class='metric-label'>Уверенность</div>
+                                <div class='metric-value' style='color: #b91c1c;'>{rubert_result['fake_proba']*100:.1f}%</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.info("RuBERT не найден. Обучи модель через train_rubert.ipynb")
+
 
                 st.markdown("---")
                 st.markdown("### Усредненный ответ")
-                sum_1 = (
-                    final_label_rf
-                    + final_label_rf
-                    + prediction_lr
-                    + prediction_nb
-                    + prediction_rf
-                )
-                if sum_1 >= 3:
+                votes = [
+                    final_label_lr,
+                    final_label_rf,
+                    prediction_lr,
+                    prediction_nb,
+                    prediction_rf,
+                ]
+                if rubert_pred_label is not None:
+                    votes.append(rubert_pred_label)
+
+                sum_1 = sum(votes)
+                threshold = len(votes) / 2
+                if sum_1 > threshold:
                     st.success(f"✅ **РЕАЛЬНАЯ НОВОСТЬ**")
 
                     st.markdown(
