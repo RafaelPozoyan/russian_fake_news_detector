@@ -1,0 +1,19 @@
+{
+    "data_path": "data/ready_dataset.csv",
+    "text_column": "combined_text",
+    "label_column": "label",
+    "model_name": "DeepPavlov/rubert-base-cased",
+    "output_dir": "models/rubert",
+    "max_length": 256,
+    "batch_size": 8,
+    "epochs": 4,
+    "learning_rate": 2e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "grad_clip": 1.0,
+    "test_size": 0.1,
+    "val_size": 0.1,
+    "random_state": 42,
+    "num_workers": 0,
+    "device": "cpu"
+}

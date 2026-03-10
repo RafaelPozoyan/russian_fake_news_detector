@@ -1,0 +1,19 @@
+{
+    "rubert": {
+        "val_acc": 0.9705215419501134,
+        "val_f1": 0.970917225950783,
+        "test_acc": 0.9750566893424036,
+        "test_f1": 0.9752808988764045,
+        "test_precision": 0.9601769911504425,
+        "test_recall": 0.9908675799086758,
+        "best_epoch": 4,
+        "best_params": {
+            "model_name": "DeepPavlov/rubert-base-cased",
+            "max_length": 256,
+            "batch_size": 8,
+            "epochs": 4,
+            "learning_rate": 2e-05,
+            "weight_decay": 0.01
+        }
+    }
+}
