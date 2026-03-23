@@ -773,12 +773,20 @@ if st.button(
     st.switch_page("pages/info.py")
 
 if st.button(
-    "Сравнение двух методов",
+    "Сравнение английских и русских моделей",
     help="Сравнивается работа русских и английских моделей",
     type="secondary",
     use_container_width=True,
 ):
     st.switch_page("pages/comparsion.py")
+
+if st.button(
+    "Сравнение классических моделей с RuBERT",
+    help="RuBERT vs TF-IDF vs Word2Vec на русском датасете",
+    type="secondary",
+    use_container_width=True,
+):
+    st.switch_page("pages/russian_comparison.py")
 
 if st.button(
     "Детектор с датасетом на английском языке",
