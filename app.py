@@ -788,6 +788,24 @@ if st.button(
 ):
     st.switch_page("pages/russian_comparison.py")
 
+col_llm1, col_llm2 = st.columns(2)
+with col_llm1:
+    if st.button(
+        "LLM v1: ruGPT-3 + LoRA",
+        help="Детекция с русской GPT моделью",
+        type="secondary",
+        use_container_width=True,
+    ):
+        st.switch_page("pages/llm_detection.py")
+with col_llm2:
+    if st.button(
+        "⚡ LLM v2: Qwen + QLoRA Ensemble",
+        help="Продвинутый подход с максимальной точностью",
+        type="secondary",
+        use_container_width=True,
+    ):
+        st.switch_page("pages/llm_detection_v2.py")
+
 if st.button(
     "Детектор с датасетом на английском языке",
     type="secondary",
