@@ -1,167 +1,45 @@
 import os
 import re
 import pickle
+import random
+import json
 import numpy as np
+import pandas as pd
 import streamlit as st
-from PIL import Image
 from gensim.models import KeyedVectors
 import nltk
-import json
-import random
-import pandas as pd
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch.nn as nn
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
 
+from utils.style import inject_css, sidebar_nav, render_prediction, load_json
+
+st.set_page_config(page_title="Детектор фейковых новостей", layout="wide")
+inject_css()
+sidebar_nav()
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ЗАГРУЗКА ДАННЫХ
+# ═════════════════════════════════════════════════════════════════════════════
 
 test_bodies = pd.read_csv("./data/test_bodies.csv")
 test_stances = pd.read_csv("./data/test_stances_unlebeledb.csv")
 test_df = test_stances.merge(test_bodies, on="Body ID", how="left")
 
-with open("results/metrics/metrics.json", "r", encoding="utf-8") as f:
-    metrics_old = json.load(f)
-with open("results/metrics/metrics_w2v.json", "r", encoding="utf-8") as f:
-    metrics_w2v = json.load(f)
-with open("results/metrics/metrics_tfidf_tuned.json", "r", encoding="utf-8") as f:
-    metrics = json.load(f)
-RUBERT_MODEL_DIR = "models/rubert/best_model"
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-@st.cache_resource
-def load_rubert_model(model_dir=RUBERT_MODEL_DIR):
-    tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(DEVICE)
-    model.eval()
-    return tokenizer, model
-
-@torch.no_grad()
-def predict_rubert(text, tokenizer, model, max_length=256):
-    text = str(text).strip()
-
-    encoded = tokenizer(
-        text,
-        truncation=True,
-        padding="max_length",
-        max_length=max_length,
-        return_tensors="pt"
-    )
-
-    input_ids = encoded["input_ids"].to(DEVICE)
-    attention_mask = encoded["attention_mask"].to(DEVICE)
-
-    outputs = model(
-        input_ids=input_ids,
-        attention_mask=attention_mask
-    )
-
-    probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()[0]
-    pred = int(np.argmax(probs))
-
-    return {
-        "label": pred,
-        "label_name": "Правдивая" if pred == 1 else "Фейковая",
-        "fake_proba": float(probs[0]),
-        "real_proba": float(probs[1])
-    }
-
-
-st.set_page_config(
-    page_title="Детектор фейковых новостей ", page_icon="🔍", layout="wide"
-)
-
-
-def set_styles():
-    st.markdown(
-        """
-    <style>
-                
-    .stApp { 
-        background: rgb(20, 19, 28);
-    }
-                
-    h1 { 
-        color: #FFFFE0; font-weight: 700; text-align: center; font-size: 3rem; margin-bottom: 0.5rem; 
-    }
-                
-    h2, h3 { 
-        color: #FFFFE0; font-weight: 600; 
-    }
-                
-    .stButton>button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: #FFFFE0; border-radius: 7px; padding: 0.75rem 3rem; font-weight: 600;
-        font-size: 1.1rem; border: none; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        transition: all 0.3s ease; width: 100%;
-    }
-                
-    .stButton>button:hover {
-        transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-    }
-                
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
-        border-radius: 7px; border: 2px solid #e5e7eb; font-size: 1rem; padding: 0.75rem; transition: all 0.3s ease;
-    }
-                
-    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-        border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-                
-    .stTextInput>label, .stTextArea>label { 
-        font-weight: 1000; color: #FFFFE0; font-size: 1.1rem; 
-    }
-                
-    [data-testid="stSidebar"] { 
-        background: #0e1117; 
-    }
-                
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { 
-        color: white;
-    }
-                
-    .metric-container { 
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 0.1rem; text-align: center; margin: 0.1rem; 
-    }
-    
-    .metric-value {
-        font-size: 2.5rem; font-weight: 700; color: #0369a1; margin-top: 0.1rem;
-    }
-    
-    .metric-label {
-        font-size: 1rem; color: #64748b;
-    }
-    
-    .stImage.round-logo img {
-        border-radius: 50%;
-    }
-    
-    .stImage.default-img img {
-        border-radius: 0;
-    }
-    
-    .streamlit-expanderHeader {
-        color: #FFFFE0; font-weight: 600;
-    }
-    
-    </style>
-    """,
-        unsafe_allow_html=True,
-    )
-
-
-set_styles()
-
 
 @st.cache_data
 def load_stopwords():
+    nltk.download("stopwords", quiet=True)
     from nltk.corpus import stopwords
-
-    nltk.download("stopwords")
     return set(stopwords.words("russian"))
 
 
-def preprocess_text(text, stopwords_list):
+STOPWORDS = load_stopwords()
+
+
+def preprocess_text(text):
     if not isinstance(text, str):
         return ""
     t = text.lower()
@@ -170,295 +48,234 @@ def preprocess_text(text, stopwords_list):
     t = re.sub(r"<.*?>", "", t)
     t = re.sub(r"[^а-яёa-z0-9\s]", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
-    toks = [w for w in t.split() if w not in stopwords_list and len(w) > 2]
-    return " ".join(toks)
+    return " ".join(w for w in t.split() if w not in STOPWORDS and len(w) > 2)
 
 
-STOPWORDS = load_stopwords()
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: Word2Vec
+# ═════════════════════════════════════════════════════════════════════════════
 
-
-# Загрузка артефактов
 @st.cache_resource
-def load_artifacts():
-    clf = None
-    kv = None
-    metrics = None
-
-    if os.path.exists("models/fake_news_w2v_lr.pkl"):
-        with open("models/fake_news_w2v_lr.pkl", "rb") as f:
-            clf = pickle.load(f)
-
-    if os.path.exists("models/w2v_vectors.kv"):
-        kv = KeyedVectors.load("models/w2v_vectors.kv")
-
-    if os.path.exists("models/metrics.pkl"):
-        with open("models/metrics.pkl", "rb") as f:
-            metrics = pickle.load(f)
-
-    return clf, kv, metrics
+def load_w2v():
+    kv = KeyedVectors.load("models/w2v_vectors.kv") if os.path.exists("models/w2v_vectors.kv") else None
+    lr = pickle.load(open("models/logisticregression_model.pkl", "rb")) if os.path.exists("models/logisticregression_model.pkl") else None
+    rf = pickle.load(open("models/randomforest_model.pkl", "rb")) if os.path.exists("models/randomforest_model.pkl") else None
+    return kv, lr, rf
 
 
-clf, kv, train_metrics = load_artifacts()
+w2v_kv, w2v_lr, w2v_rf = load_w2v()
 
 
-def load_model():
-    """Загрузка обученных моделей и векторизатора"""
-    try:
-        model_randfor_tf = pickle.load(open("models/random_forest_model_tf.pkl", "rb"))
-        model_naibayes_tf = pickle.load(open("models/naive_bayes_model_tf.pkl", "rb"))
-        model_logreg_tf = pickle.load(
-            open("models/logistic_regression_model_tf.pkl", "rb")
-        )
-        vectorizer_tf = pickle.load(open("models/tfidf_vectorizer_tf.pkl", "rb"))
-        return model_randfor_tf, model_naibayes_tf, model_logreg_tf, vectorizer_tf, True
-    except FileNotFoundError:
-        return None, None, None, None, False
-
-
-# Загружаем модель
-model_randfor_tf, model_naibayes_tf, model_logreg_tf, vectorizer_tf, model_loaded = (
-    load_model()
-)
-stopwords_list = load_stopwords()
-
-
-# Функции признаков
 def doc_vector(tokens, kv_model):
     vecs = [kv_model[w] for w in tokens if w in kv_model]
-
-    if not vecs:
-        return np.zeros(kv_model.vector_size, dtype=np.float32)
-
-    return np.vstack(vecs).mean(axis=0)
+    return np.vstack(vecs).mean(axis=0) if vecs else np.zeros(kv_model.vector_size, dtype=np.float32)
 
 
-def cosine(u, v):
-    nu, nv = np.linalg.norm(u), np.linalg.norm(v)
-
-    if nu == 0 or nv == 0:
-        return 0.0
-
-    return float(np.dot(u, v) / (nu * nv))
-
-
-def jaccard(a_tokens, b_tokens):
-    A, B = set(a_tokens), set(b_tokens)
-
-    if not A and not B:
-        return 0.0
-
-    return len(A & B) / max(1, len(A | B))
-
-
-def overlap_ratio(a_tokens, b_tokens):
-    A, B = set(a_tokens), set(b_tokens)
-
-    return 0.0 if not A else len(A & B) / len(A)
+def predict_w2v(headline, body, model):
+    h_clean = preprocess_text(headline)
+    b_clean = preprocess_text(body)
+    if len(h_clean) < 2 or len(b_clean) < 5:
+        return None, None
+    htoks, btoks = h_clean.split()[:150], b_clean.split()[:150]
+    h_vec, b_vec = doc_vector(htoks, w2v_kv), doc_vector(btoks, w2v_kv)
+    cos_sim = float(np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8))
+    jacc = len(set(htoks) & set(btoks)) / max(1, len(set(htoks) | set(btoks)))
+    ovr = len(set(htoks) & set(btoks)) / max(1, len(set(htoks)))
+    l2 = float(np.linalg.norm(h_vec - b_vec))
+    feats = np.hstack([h_vec, b_vec, np.abs(h_vec - b_vec), h_vec * b_vec, [cos_sim, jacc, ovr, l2]]).reshape(1, -1)
+    prob = model.predict_proba(feats)[0]
+    if cos_sim < 0.10 or ovr <= 0.00:
+        return 0, max(prob[0], 0.7)
+    if prob[1] >= 0.55 and cos_sim >= 0.20 and jacc >= 0.005 and ovr >= 0.10 and l2 <= 14.0:
+        return 1, prob[1]
+    return 0, max(prob[0], 0.5)
 
 
-def build_feature_vector(headline_clean, body_clean, kv_model, max_len=150):
-    htoks = headline_clean.split()[:max_len]
-    btoks = body_clean.split()[:max_len]
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: TF-IDF
+# ═════════════════════════════════════════════════════════════════════════════
 
-    h_vec = doc_vector(htoks, kv_model)
-    b_vec = doc_vector(btoks, kv_model)
-
-    cos_sim = cosine(h_vec, b_vec)
-    jacc = jaccard(htoks, btoks)
-    ovr = overlap_ratio(htoks, btoks)
-    diff = np.abs(h_vec - b_vec)
-    prod = h_vec * b_vec
-    l2 = np.linalg.norm(h_vec - b_vec)
-
-    feats = np.hstack([h_vec, b_vec, diff, prod, [cos_sim, jacc, ovr, l2]])
-    return feats, {"cosine": cos_sim, "jaccard": jacc, "overlap": ovr, "l2": l2}
+@st.cache_resource
+def load_tfidf():
+    try:
+        rf = pickle.load(open("models/random_forest_model_tf.pkl", "rb"))
+        nb = pickle.load(open("models/naive_bayes_model_tf.pkl", "rb"))
+        lr = pickle.load(open("models/logistic_regression_model_tf.pkl", "rb"))
+        vec = pickle.load(open("models/tfidf_vectorizer_tf.pkl", "rb"))
+        return rf, nb, lr, vec
+    except FileNotFoundError:
+        return None, None, None, None
 
 
-def predict(headline_raw, body_raw, clf_model, kv_model):
-    headline_clean = preprocess_text(headline_raw, STOPWORDS)
-    body_clean = preprocess_text(body_raw, STOPWORDS)
-
-    if len(headline_clean) < 2 or len(body_clean) < 5:
-        return None, None, headline_clean, body_clean, None
-
-    X, rel = build_feature_vector(headline_clean, body_clean, kv_model)
-    X = X.reshape(1, -1)
-
-    prob = clf_model.predict_proba(X)[0]
-    pred = int(clf_model.predict(X)[0])
-
-    return pred, prob, headline_clean, body_clean, rel
+tfidf_rf, tfidf_nb, tfidf_lr, tfidf_vec = load_tfidf()
 
 
-# Фиксированные пороги и правила
-DEFAULT_THRESHOLDS = {
-    "proba_real": 0.55,
-    "cos_min": 0.20,
-    "jacc_min": 0.005,
-    "overlap_min": 0.10,
-    "l2_max": 14.0,
-}
-HARD_RULES = {
-    "very_low_cos": 0.10,
-    "zero_overlap": 0.00,
-}
+def predict_tfidf(headline, body, model):
+    h_clean = preprocess_text(headline)
+    b_clean = preprocess_text(body)
+    X = tfidf_vec.transform([f"{h_clean} {b_clean}"])
+    pred = int(model.predict(X)[0])
+    prob = model.predict_proba(X)[0]
+    return pred, float(prob[pred])
 
 
-def decide_with_rules(
-    prob_real, rel, thresholds=DEFAULT_THRESHOLDS, hard_rules=HARD_RULES
-):
-    reasons = []
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: RuBERT
+# ═════════════════════════════════════════════════════════════════════════════
 
-    if rel["cosine"] < hard_rules["very_low_cos"]:
-        reasons.append(f"Низкая косинусная близость (cosine): {rel['cosine']:.3f}")
-        return 0, reasons
-
-    if rel["overlap"] <= hard_rules["zero_overlap"]:
-        reasons.append("В заголовке нет слов, встречающихся в тексте (overlap=0)")
-        return 0, reasons
-
-    soft_ok = True
-    if rel["cosine"] < thresholds["cos_min"]:
-        soft_ok = False
-        reasons.append(
-            f"cosine ниже порога ({rel['cosine']:.3f} < {thresholds['cos_min']})"
-        )
-
-    if rel["jaccard"] < thresholds["jacc_min"]:
-        soft_ok = False
-        reasons.append(
-            f"Jaccard ниже порога ({rel['jaccard']:.3f} < {thresholds['jacc_min']})"
-        )
-
-    if rel["overlap"] < thresholds["overlap_min"]:
-        soft_ok = False
-        reasons.append(
-            f"overlap ниже порога ({rel['overlap']:.3f} < {thresholds['overlap_min']})"
-        )
-
-    if rel["l2"] > thresholds["l2_max"]:
-        soft_ok = False
-        reasons.append(f"L2 выше порога ({rel['l2']:.3f} > {thresholds['l2_max']})")
-
-    if prob_real >= thresholds["proba_real"] and soft_ok:
-        return 1, reasons
-    else:
-
-        if prob_real >= thresholds["proba_real"]:
-            reasons.append(
-                f"Вероятность модели высокая ({prob_real*100:.1f}%), но связи между заголовком и текстом нет"
-            )
-
-        return 0, reasons
+RUBERT_DIR = "models/rubert/best_model"
 
 
-# Сайдбар
-with st.sidebar:
-    logo = Image.open("assets/logo.png")
-    st.image(logo, output_format="round-logo")
+@st.cache_resource
+def load_rubert():
+    if not os.path.exists(RUBERT_DIR):
+        return None, None
+    tok = AutoTokenizer.from_pretrained(RUBERT_DIR)
+    mdl = AutoModelForSequenceClassification.from_pretrained(RUBERT_DIR).to(DEVICE)
+    mdl.eval()
+    return tok, mdl
 
-    st.markdown("---")
-    st.markdown(
-        """
-        <div style='color: #FFFFE0;'>
-            <h3 style='color: #FFFFE0;'>О проекте</h3>
-            <p>Система автоматической детекции фейковых новостей. При введении заголовка и основного текста статьи, сайт проверит,
-            является ли инфоповод подлинным.</p>
-            </p>При решении задачи используются TF-IDF и Word2Vec. Материал проверяется на согласованность заголовка и основного текста.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    st.markdown("---")
-    st.markdown(
-        """
-        <div style='color: #FFFFE0;'>
-            <h3 style='color: #FFFFE0;'>Способ решения проблемы</h3>
-            <p>На данной странице модели обучены на датасете на русском языке.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+rubert_tok, rubert_mdl = load_rubert()
 
-    st.markdown("---")
 
-    if kv is not None:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус Word2Vec:</h4><p>Модели и эмбеддинги загружены</p></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус Word2Vec:</h4><p>Нет моделей или эмбеддингов в models</p></div>",
-            unsafe_allow_html=True,
-        )
+@torch.no_grad()
+def predict_rubert(headline, body):
+    enc = rubert_tok(f"{headline} {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
+    out = rubert_mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
+    probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
+    pred = int(np.argmax(probs))
+    return pred, float(probs[pred])
 
-    if model_loaded:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус TF-IDF:</h4><p>Модели и эмбеддинги загружены</p></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус TF-IDF:</h4><p>Нет моделей или эмбеддингов в models</p></div>",
-            unsafe_allow_html=True,
-        )
 
-    st.markdown("---")
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: LLM V1 — ruGPT-3 + LoRA
+# ═════════════════════════════════════════════════════════════════════════════
 
-    rubert_status = os.path.exists(RUBERT_MODEL_DIR)
-    if rubert_status:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус RuBERT:</h4><p>Модель загружена</p></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='color:#FFFFE0;'><h4>Статус RuBERT:</h4><p>Нет модели в models/rubert/best_model</p></div>",
-            unsafe_allow_html=True,
-        )
+LLM_V1_DIR = "models/llm/rugpt3_lora"
+GPT_BASE = "ai-forever/rugpt3small_based_on_gpt2"
 
-# Главный контент
-st.title("Детектор фейковых новостей")
-st.info("Используются модели, обученные на русском датасете")
 
+@st.cache_resource
+def load_llm_v1():
+    if not os.path.exists(LLM_V1_DIR):
+        return None, None
+    from peft import PeftModel
+    tok = AutoTokenizer.from_pretrained(LLM_V1_DIR)
+    tok.padding_side = "left"
+    base = AutoModelForSequenceClassification.from_pretrained(GPT_BASE, num_labels=2)
+    base.config.pad_token_id = tok.pad_token_id
+    model = PeftModel.from_pretrained(base, LLM_V1_DIR).merge_and_unload().to(DEVICE)
+    model.eval()
+    return tok, model
+
+
+@torch.no_grad()
+def predict_llm_v1(headline, body):
+    tok, mdl = load_llm_v1()
+    if tok is None:
+        return None, None
+    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
+    out = mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
+    probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
+    pred = int(np.argmax(probs))
+    return pred, float(probs[pred])
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: LLM V2 — Frozen GPT + Sklearn
+# ═════════════════════════════════════════════════════════════════════════════
+
+import joblib
+
+LLM_V2_DIR = "models/llm_v2"
+
+
+@st.cache_resource
+def load_llm_v2():
+    scaler_path = os.path.join(LLM_V2_DIR, "scaler.pkl")
+    clf_path = os.path.join(LLM_V2_DIR, "all_classifiers.pkl")
+    if not os.path.exists(scaler_path) or not os.path.exists(clf_path):
+        return None
+    tok = AutoTokenizer.from_pretrained(GPT_BASE)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    enc = AutoModel.from_pretrained(GPT_BASE).to(DEVICE)
+    enc.eval()
+    for p in enc.parameters():
+        p.requires_grad = False
+    scaler = joblib.load(scaler_path)
+    classifiers = joblib.load(clf_path)
+    return tok, enc, scaler, classifiers
+
+
+@torch.inference_mode()
+def predict_llm_v2(headline, body):
+    result = load_llm_v2()
+    if result is None:
+        return None, None
+    tok, encoder, scaler, classifiers = result
+
+    def encode(text):
+        enc = tok(str(text).strip(), truncation=True, max_length=64, padding=True, return_tensors="pt")
+        hidden = encoder(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE)).last_hidden_state
+        mf = enc["attention_mask"].to(DEVICE).unsqueeze(-1).float()
+        return (hidden * mf).sum(1) / mf.sum(1).clamp(min=1e-9)
+
+    h_emb, b_emb = encode(headline), encode(body)
+    feats = torch.cat([h_emb, b_emb, (h_emb - b_emb).abs(), h_emb * b_emb], dim=-1).cpu().numpy()
+    feats_scaled = scaler.transform(feats)
+    probs = np.zeros(2)
+    for _, model in classifiers.items():
+        probs += model.predict_proba(feats_scaled)[0]
+    probs /= len(classifiers)
+    pred = int(np.argmax(probs))
+    return pred, float(probs[pred])
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# МОДЕЛИ: LLM V3 — ruGPT-3 + LoRA Max
+# ═════════════════════════════════════════════════════════════════════════════
+
+LLM_V3_DIR = "models/llm_v3/lora_adapter"
+
+
+@st.cache_resource
+def load_llm_v3():
+    if not os.path.exists(LLM_V3_DIR):
+        return None, None
+    from peft import PeftModel
+    tok = AutoTokenizer.from_pretrained(LLM_V3_DIR)
+    tok.padding_side = "left"
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    base = AutoModelForSequenceClassification.from_pretrained(GPT_BASE, num_labels=2)
+    base.config.pad_token_id = tok.pad_token_id
+    model = PeftModel.from_pretrained(base, LLM_V3_DIR).merge_and_unload().to(DEVICE)
+    model.eval()
+    return tok, model
+
+
+@torch.no_grad()
+def predict_llm_v3(headline, body):
+    tok, mdl = load_llm_v3()
+    if tok is None:
+        return None, None
+    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
+    out = mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
+    probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
+    pred = int(np.argmax(probs))
+    return pred, float(probs[pred])
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ИНТЕРФЕЙС
+# ═════════════════════════════════════════════════════════════════════════════
+
+st.markdown("# Детектор фейковых новостей")
 st.markdown(
-    """
-    <style>
-    div[data-testid="stExpander"] div[role="button"] {
-        background-color: #2e86de;
-        color: white;
-        border-radius: 5px;
-    }
-    div[data-testid="stExpander"] div[role="region"] {
-        background-color: #dff9fb;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
+    "Введите заголовок и текст новости — система проверит их через **все доступные модели** и покажет результат."
 )
-with st.expander("Как пользоваться?", expanded=False):
-    st.markdown(
-        """<div style='color:#FFFFE0;'>
-    1. Введите заголовок новости в первое поле
-    </div>""",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """<div style='color:#FFFFE0;'>
-    2. Вставьте текст новости во второе поле
-    </div>""",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """<div style='color:#FFFFE0;'>
-    3. Нажмите кнопку "Проверить новость"
-    </div>""",
-        unsafe_allow_html=True,
-    )
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 if "headline" not in st.session_state:
     st.session_state.headline = ""
@@ -466,10 +283,10 @@ if "body" not in st.session_state:
     st.session_state.body = ""
 
 
-def pick_news():
+def pick_random():
     idx = random.randint(0, len(test_df) - 1)
-    st.session_state.headline = test_df.loc[idx, "Headline1"]
-    st.session_state.body = test_df.loc[idx, "articleBody"]
+    st.session_state.headline = str(test_df.loc[idx, "Headline1"])
+    st.session_state.body = str(test_df.loc[idx, "articleBody"])
 
 
 def clear_fields():
@@ -477,338 +294,129 @@ def clear_fields():
     st.session_state.body = ""
 
 
-def clear_fields():
-    st.session_state.headline = ""
-    st.session_state.body = ""
+headline = st.text_input("Заголовок", placeholder="Введите заголовок новости", key="headline")
+body = st.text_area("Текст статьи", height=180, placeholder="Введите текст статьи", key="body")
+
+c1, c2, c3 = st.columns([1, 1, 2])
+with c1:
+    st.button("Случайная новость", on_click=pick_random, use_container_width=True)
+with c2:
+    st.button("Очистить", on_click=clear_fields, use_container_width=True)
+with c3:
+    check = st.button("Проверить", type="primary", use_container_width=True)
 
 
-with st.container():
-    headline = st.text_input(
-        "Заголовок новости:", placeholder="Вставьте заголовок новости", key="headline"
-    )
-    body = st.text_area(
-        "Текст новости:",
-        height=250,
-        placeholder="Вставьте основной текст новости",
-        key="body",
-    )
-    c1, c2, c3 = st.columns([1, 2, 1])
+# ═════════════════════════════════════════════════════════════════════════════
+# РЕЗУЛЬТАТЫ
+# ═════════════════════════════════════════════════════════════════════════════
 
-    with c2:
+if check:
+    if not headline.strip() or not body.strip():
+        st.warning("Заполните оба поля.")
+        st.stop()
 
-        but1, but2 = st.columns(2)
-
-        with but1:
-            st.button(
-                "Подобрать новость",
-                help="Взять рандомную новость из тестового датасета",
-                on_click=pick_news,
-                use_container_width=True,
-            )
-        with but2:
-            st.button(
-                "Очистить поля",
-                help="Привести поля в исходный вид",
-                on_click=clear_fields,
-                use_container_width=True,
-            )
-
-        check_button = st.button(
-            "Проверить новость", type="primary", use_container_width=True
-        )
-
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Предсказание
-
-if check_button:
     st.markdown("---")
-    if not headline or not body:
-        st.warning("⚠️ Пожалуйста, заполните заголовок и текст новости")
+    all_results = []
+
+    # Word2Vec
+    if w2v_kv and w2v_lr and w2v_rf:
+        for model, name in [(w2v_lr, "LR + Word2Vec"), (w2v_rf, "RF + Word2Vec")]:
+            pred, conf = predict_w2v(headline, body, model)
+            if pred is not None:
+                all_results.append((name, "Word2Vec", pred, conf))
+
+    # TF-IDF
+    if tfidf_vec is not None:
+        for model, name in [(tfidf_lr, "LR + TF-IDF"), (tfidf_nb, "NB + TF-IDF"), (tfidf_rf, "RF + TF-IDF")]:
+            pred, conf = predict_tfidf(headline, body, model)
+            all_results.append((name, "TF-IDF", pred, conf))
+
+    # RuBERT
+    if rubert_tok is not None:
+        pred, conf = predict_rubert(headline, body)
+        all_results.append(("RuBERT", "Трансформер", pred, conf))
+
+    # LLM V1
+    pred, conf = predict_llm_v1(headline, body)
+    if pred is not None:
+        all_results.append(("ruGPT-3 + LoRA (V1)", "LLM", pred, conf))
+
+    # LLM V2
+    pred, conf = predict_llm_v2(headline, body)
+    if pred is not None:
+        all_results.append(("Frozen GPT + Sklearn (V2)", "LLM", pred, conf))
+
+    # LLM V3
+    pred, conf = predict_llm_v3(headline, body)
+    if pred is not None:
+        all_results.append(("ruGPT-3 + LoRA Max (V3)", "LLM", pred, conf))
+
+    # Вывод результатов
+    if not all_results:
+        st.error("Ни одна модель не доступна.")
+        st.stop()
+
+    categories = {}
+    for name, cat, pred, conf in all_results:
+        categories.setdefault(cat, []).append((name, pred, conf))
+
+    for cat_name, items in categories.items():
+        st.markdown(f"#### {cat_name}")
+        if len(items) == 1:
+            render_prediction(items[0][1], items[0][2], items[0][0])
+        elif len(items) <= 3:
+            cols = st.columns(len(items))
+            for i, (name, pred, conf) in enumerate(items):
+                with cols[i]:
+                    render_prediction(pred, conf, name)
+        else:
+            cols = st.columns(3)
+            for i in range(3):
+                with cols[i]:
+                    render_prediction(items[i][1], items[i][2], items[i][0])
+            for name, pred, conf in items[3:]:
+                render_prediction(pred, conf, name)
+
+    # Итоговый вердикт
+    st.markdown("---")
+    total = len(all_results)
+    real_count = sum(1 for _, _, p, _ in all_results if p == 1)
+    fake_count = total - real_count
+
+    st.markdown("#### Итоговый вердикт")
+    if real_count > fake_count:
+        st.success(f"**Достоверная новость** — {real_count} из {total} моделей считают новость настоящей")
+    elif fake_count > real_count:
+        st.error(f"**Фейк** — {fake_count} из {total} моделей считают новость фейковой")
     else:
-        with st.spinner("🔄 Анализирую новость..."):
-            try:
-                with open("models/logisticregression_model.pkl", "rb") as f:
-                    clf_lr = pickle.load(f)
-                with open("models/randomforest_model.pkl", "rb") as f:
-                    clf_rf = pickle.load(f)
+        st.warning(f"**Мнения разделились** — {real_count} за, {fake_count} против из {total}")
 
-                # prediction для каждой модели
-                pred_lr, prob_lr, h_clean, b_clean, rel_lr = predict(
-                    headline, body, clf_lr, kv
-                )
-                pred_rf, prob_rf, _, _, rel_rf = predict(headline, body, clf_rf, kv)
+    with st.expander("Подробная сводка"):
+        df = pd.DataFrame([
+            {"Модель": name, "Категория": cat, "Вердикт": "Реальная" if pred == 1 else "Фейк",
+             "Уверенность": f"{conf:.1%}"}
+            for name, cat, pred, conf in all_results
+        ])
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
-                # Проверка бизнес-правил
-                final_label_lr, reasons_lr = decide_with_rules(prob_lr[1], rel_lr)
-                final_label_rf, reasons_rf = decide_with_rules(prob_rf[1], rel_rf)
-
-                # =================================
-                # Вывод результатов работы Word2Vec
-                # =================================
-                st.markdown("### Word2Vec")
-                col1, col2 = st.columns(2)
-
-                results = [
-                    {
-                        "col": col1,
-                        "name": "Logistic Regression",
-                        "final_label": final_label_lr,
-                        "prob": prob_lr[1],
-                        "accuracy": metrics_w2v["logisticregression"]["val_accuracy"],
-                        "reasons": reasons_lr,
-                    },
-                    {
-                        "col": col2,
-                        "name": "Random Forest",
-                        "final_label": final_label_rf,
-                        "prob": prob_rf[1],
-                        "accuracy": metrics_w2v["randomforest"]["val_accuracy"],
-                        "reasons": reasons_rf,
-                    },
-                ]
-
-                for res in results:
-                    with res["col"]:
-                        if res["final_label"] == 1:
-                            st.success("✅ **РЕАЛЬНАЯ НОВОСТЬ**")
-                            st.markdown(
-                                f"""
-                                <div class='metric-container'>
-                                    <div class='metric-label'>{res['name']}</div>
-                                    <div class='metric-label'>Уверенность</div>
-                                    <div class='metric-value'>{res['prob']*100:.1f}%</div>
-                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                        else:
-                            st.error("❌ **ФЕЙКОВАЯ НОВОСТЬ**")
-                            st.markdown(
-                                f"""
-                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                    <div class='metric-label'>{res['name']}</div>
-                                    <div class='metric-label'>Уверенность</div>
-                                    <div class='metric-value' style='color: #b91c1c;'>{(1-res['prob'])*100:.1f}%</div>
-                                    <div class='metric-label'><strong>Accuracy:</strong> {res['accuracy']:.3f}</div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                            if res["reasons"]:
-                                with st.expander("Почему сработали бизнес-правила?"):
-                                    for r in res["reasons"]:
-                                        st.write(f"- {r}")
-
-                # =================================
-                # Вывод результатов TF-IDF
-                # =================================
-
-                headline_clean = preprocess_text(headline, stopwords_list)
-                body_clean = preprocess_text(body, stopwords_list)
-
-                # Комбинируем
-                body_words = body_clean.split()
-                combined_text = f"{headline_clean} {' '.join(body_words)}"
-
-                text_vec = vectorizer_tf.transform([combined_text])
-
-                # предикты на random forest
-                prediction_rf = model_randfor_tf.predict(text_vec)[0]
-                probabilities_rf = model_randfor_tf.predict_proba(text_vec)[0]
-
-                # предикты на naive bayes
-                prediction_nb = model_naibayes_tf.predict(text_vec)[0]
-                probabilities_nb = model_naibayes_tf.predict_proba(text_vec)[0]
-
-                # предикты на logistic regression
-                prediction_lr = model_logreg_tf.predict(text_vec)[0]
-                probabilities_lr = model_logreg_tf.predict_proba(text_vec)[0]
-
-                st.markdown("### TF-IDF")
-
-                col1, col2, col3 = st.columns(3)
-
-                results = [
-                    {
-                        "col": col3,
-                        "name": "Random Forest",
-                        "prediction": prediction_rf,
-                        "probabilities": probabilities_rf,
-                        "metric_key": "random_forest",
-                        "metrics": metrics,
-                    },
-                    {
-                        "col": col2,
-                        "name": "Naive Bayes",
-                        "prediction": prediction_nb,
-                        "probabilities": probabilities_nb,
-                        "metric_key": "naive_bayes",
-                        "metrics": metrics,
-                    },
-                    {
-                        "col": col1,
-                        "name": "Logistic Regression",
-                        "prediction": prediction_lr,
-                        "probabilities": probabilities_lr,
-                        "metric_key": "logistic_regression",
-                        "metrics": metrics,
-                    },
-                ]
-
-                for res in results:
-                    with res["col"]:
-                        if res["prediction"] == 1:
-                            confidence = res["probabilities"][1] * 100
-                            st.success("✅ **РЕАЛЬНАЯ НОВОСТЬ**")
-                            st.markdown(
-                                f"""
-                                <div class='metric-container'>
-                                    <div class='metric-label'>{res['name']}</div>
-                                    <div class='metric-label'>Уверенность</div>
-                                    <div class='metric-value'>{confidence:.1f}%</div>
-                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                        else:
-                            confidence = res["probabilities"][0] * 100
-                            st.error("❌ **ФЕЙКОВАЯ НОВОСТЬ**")
-                            st.markdown(
-                                f"""
-                                <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                    <div class='metric-label'>{res['name']}</div>
-                                    <div class='metric-label'>Уверенность</div>
-                                    <div class='metric-value' style='color: #b91c1c;'>{confidence:.1f}%</div>
-                                    <div class='metric-label'><strong>Accuracy:</strong> {res['metrics'][res["metric_key"]]["val_acc"]:.3f}</div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                
-
-                # =================================
-                # Вывод результатов RuBERT
-                # =================================
-                rubert_pred_label = None
-
-                if os.path.exists(RUBERT_MODEL_DIR):
-                    st.markdown("### RuBERT")
-
-                    tokenizer_rb, model_rb = load_rubert_model()
-                    combined_for_rubert = f"{headline} {body}"
-                    rubert_result = predict_rubert(combined_for_rubert, tokenizer_rb, model_rb)
-
-                    rubert_pred_label = rubert_result["label"]
-
-                    if rubert_pred_label == 1:
-                        st.success("✅ **РЕАЛЬНАЯ НОВОСТЬ**")
-                        st.markdown(
-                            f"""
-                            <div class='metric-container'>
-                                <div class='metric-label'>RuBERT</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value'>{rubert_result['real_proba']*100:.1f}%</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        st.error("❌ **ФЕЙКОВАЯ НОВОСТЬ**")
-                        st.markdown(
-                            f"""
-                            <div class='metric-container' style='background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);'>
-                                <div class='metric-label'>RuBERT</div>
-                                <div class='metric-label'>Уверенность</div>
-                                <div class='metric-value' style='color: #b91c1c;'>{rubert_result['fake_proba']*100:.1f}%</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                else:
-                    st.info("RuBERT не найден. Обучи модель через train_rubert.ipynb")
-
-
-                st.markdown("---")
-                st.markdown("### Усредненный ответ")
-                votes = [
-                    final_label_lr,
-                    final_label_rf,
-                    prediction_lr,
-                    prediction_nb,
-                    prediction_rf,
-                ]
-                if rubert_pred_label is not None:
-                    votes.append(rubert_pred_label)
-
-                sum_1 = sum(votes)
-                threshold = len(votes) / 2
-                if sum_1 > threshold:
-                    st.success(f"✅ **РЕАЛЬНАЯ НОВОСТЬ**")
-
-                    st.markdown(
-                        "Количество предиктов на то, что новость реальная больше."
-                    )
-                else:
-                    st.error(f"❌ **ФЕЙКОВАЯ НОВОСТЬ**")
-                    st.markdown(
-                        "Количество предиктов на то, что новость фейковая больше."
-                    )
-
-            except Exception as e:
-                st.error(f"❌ Ошибка: {str(e)}")
+# ═════════════════════════════════════════════════════════════════════════════
+# ССЫЛКИ НА ПОДХОДЫ
+# ═════════════════════════════════════════════════════════════════════════════
 
 st.markdown("---")
+st.markdown("#### Подробнее о подходах")
+st.markdown(
+    "На страницах ниже описана теоретическая часть: как работает каждый метод, "
+    "на чём обучались модели и какие результаты они показали."
+)
 
-
-if st.button(
-    "Обзор подходов",
-    help="Открыть страницу с обзором подходов: использованных моделей и векторизаторов",
-    type="secondary",
-    use_container_width=True,
-):
-    st.switch_page("pages/info.py")
-
-if st.button(
-    "Сравнение английских и русских моделей",
-    help="Сравнивается работа русских и английских моделей",
-    type="secondary",
-    use_container_width=True,
-):
-    st.switch_page("pages/comparsion.py")
-
-if st.button(
-    "Сравнение классических моделей с RuBERT",
-    help="RuBERT vs TF-IDF vs Word2Vec на русском датасете",
-    type="secondary",
-    use_container_width=True,
-):
-    st.switch_page("pages/russian_comparison.py")
-
-col_llm1, col_llm2 = st.columns(2)
-with col_llm1:
-    if st.button(
-        "LLM v1: ruGPT-3 + LoRA",
-        help="Детекция с русской GPT моделью",
-        type="secondary",
-        use_container_width=True,
-    ):
-        st.switch_page("pages/llm_detection.py")
-with col_llm2:
-    if st.button(
-        "⚡ LLM v2: Qwen + QLoRA Ensemble",
-        help="Продвинутый подход с максимальной точностью",
-        type="secondary",
-        use_container_width=True,
-    ):
-        st.switch_page("pages/llm_detection_v2.py")
-
-if st.button(
-    "Детектор с датасетом на английском языке",
-    type="secondary",
-    use_container_width=True,
-):
-    st.switch_page("pages/eng.py")
+c1, c2, c3 = st.columns(3)
+with c1:
+    if st.button("Классические модели", use_container_width=True):
+        st.switch_page("pages/1_classical.py")
+with c2:
+    if st.button("RuBERT", use_container_width=True):
+        st.switch_page("pages/2_rubert.py")
+with c3:
+    if st.button("LLM-подходы", use_container_width=True):
+        st.switch_page("pages/3_llm.py")
