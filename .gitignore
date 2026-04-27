@@ -23,4 +23,4 @@ fact_check_cache/
 notebooks/rubert/train_rubert_nli_factcheck.ipynb
 models/rubert-tiny2/
 
-utils
+# utils
