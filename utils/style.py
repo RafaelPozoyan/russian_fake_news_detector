@@ -144,12 +144,21 @@ def sidebar_nav():
 
         st.markdown("---")
         st.page_link("app.py", label="Главная")
+
+        st.markdown("**Методы**")
         st.page_link("pages/1_classical.py", label="Классические модели")
         st.page_link("pages/2_rubert.py", label="RuBERT")
-        st.page_link("pages/3_llm.py", label="LLM-подходы")
+        st.page_link("pages/3_rugpt_lora.py", label="ruGPT-3 + LoRA")
+        st.page_link("pages/4_deepseek.py", label="DeepSeek API")
+
+        st.markdown("**Сравнения**")
+        st.page_link("pages/5_compare_classical.py", label="Классические между собой")
+        st.page_link("pages/6_compare_rugpt_rubert.py", label="ruGPT-3 + LoRA vs RuBERT")
+        st.page_link("pages/7_compare_rubert_deepseek.py", label="RuBERT vs DeepSeek")
+        st.page_link("pages/8_compare_all.py", label="Все модели")
+
         st.markdown("---")
-        st.page_link("pages/4_compare.py", label="Сравнение моделей")
-        st.page_link("pages/5_english.py", label="Английский детектор")
+        st.page_link("pages/9_english.py", label="Английский детектор")
         st.markdown("---")
         st.caption("ВКР | Позоян Р.О. | БПМ-22-ПО-3")
 
@@ -160,11 +169,13 @@ def back_to_main():
         st.switch_page("app.py")
 
 
-def render_comparison_section():
+def render_comparsion_section():
     """Секция сравнения с другими подходами (для страниц методов)."""
     st.markdown("---")
     st.markdown("## Сравнение с другими подходами")
-    if os.path.exists("assets/complete_models_comparison.png"):
-        st.image("assets/complete_models_comparison.png", caption="Сравнение всех моделей по Accuracy и F1")
+    if os.path.exists("assets/final_comparsion_accuracy_f1.png"):
+        st.image("assets/final_comparsion_accuracy_f1.png", caption="Сравнение всех моделей по Accuracy и F1")
+    elif os.path.exists("assets/complete_models_comparsion.png"):
+        st.image("assets/complete_models_comparsion.png", caption="Сравнение всех моделей по Accuracy и F1")
     if st.button("Подробное сравнение всех моделей →", key="_compare_link"):
-        st.switch_page("pages/4_compare.py")
+        st.switch_page("pages/8_compare_all.py")

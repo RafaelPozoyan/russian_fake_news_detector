@@ -1,18 +1,20 @@
 import os
 import re
+import json
 import pickle
 import random
-import json
 import numpy as np
 import pandas as pd
 import streamlit as st
 from gensim.models import KeyedVectors
 import nltk
 import torch
-import torch.nn as nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from dotenv import load_dotenv
 
-from utils.style import inject_css, sidebar_nav, render_prediction, load_json
+from utils.style import inject_css, sidebar_nav, render_prediction
+
+load_dotenv()
 
 st.set_page_config(page_title="Детектор фейковых новостей", layout="wide")
 inject_css()
@@ -149,33 +151,35 @@ def predict_rubert(headline, body):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# МОДЕЛИ: LLM V1 — ruGPT-3 + LoRA
+# МОДЕЛИ: ruGPT-3 + LoRA (тонко настроенная конфигурация)
 # ═════════════════════════════════════════════════════════════════════════════
 
-LLM_V1_DIR = "models/llm/rugpt3_lora"
+RUGPT_LORA_DIR = "models/llm_v3_tuned/lora_adapter"
 GPT_BASE = "ai-forever/rugpt3small_based_on_gpt2"
 
 
 @st.cache_resource
-def load_llm_v1():
-    if not os.path.exists(LLM_V1_DIR):
+def load_rugpt_lora():
+    if not os.path.exists(RUGPT_LORA_DIR):
         return None, None
     from peft import PeftModel
-    tok = AutoTokenizer.from_pretrained(LLM_V1_DIR)
+    tok = AutoTokenizer.from_pretrained(RUGPT_LORA_DIR)
     tok.padding_side = "left"
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     base = AutoModelForSequenceClassification.from_pretrained(GPT_BASE, num_labels=2)
     base.config.pad_token_id = tok.pad_token_id
-    model = PeftModel.from_pretrained(base, LLM_V1_DIR).merge_and_unload().to(DEVICE)
+    model = PeftModel.from_pretrained(base, RUGPT_LORA_DIR).merge_and_unload().to(DEVICE)
     model.eval()
     return tok, model
 
 
 @torch.no_grad()
-def predict_llm_v1(headline, body):
-    tok, mdl = load_llm_v1()
+def predict_rugpt_lora(headline, body):
+    tok, mdl = load_rugpt_lora()
     if tok is None:
         return None, None
-    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
+    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=512, return_tensors="pt")
     out = mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
     probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
     pred = int(np.argmax(probs))
@@ -183,89 +187,81 @@ def predict_llm_v1(headline, body):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# МОДЕЛИ: LLM V2 — Frozen GPT + Sklearn
+# МОДЕЛИ: DeepSeek API
 # ═════════════════════════════════════════════════════════════════════════════
 
-import joblib
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-LLM_V2_DIR = "models/llm_v2"
+DS_SYSTEM_PROMPT = (
+    "You classify Russian-language news as REAL (label=1) or FAKE (label=0). "
+    "Read the headline and body, identify the topical claim, and decide whether it is "
+    "consistent with documented events (real) or has signs of fabrication, conspiracy framing, "
+    "or implausible specifics (fake). "
+    'Output JSON only: {"reasoning": "1-2 sentences", "label": 0 or 1, "confidence": "low|medium|high"}.'
+)
 
 
 @st.cache_resource
-def load_llm_v2():
-    scaler_path = os.path.join(LLM_V2_DIR, "scaler.pkl")
-    clf_path = os.path.join(LLM_V2_DIR, "all_classifiers.pkl")
-    if not os.path.exists(scaler_path) or not os.path.exists(clf_path):
+def load_deepseek_client():
+    if not DEEPSEEK_API_KEY:
         return None
-    tok = AutoTokenizer.from_pretrained(GPT_BASE)
-    if tok.pad_token is None:
-        tok.pad_token = tok.eos_token
-    enc = AutoModel.from_pretrained(GPT_BASE).to(DEVICE)
-    enc.eval()
-    for p in enc.parameters():
-        p.requires_grad = False
-    scaler = joblib.load(scaler_path)
-    classifiers = joblib.load(clf_path)
-    return tok, enc, scaler, classifiers
+    try:
+        from openai import OpenAI
+        return OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+    except Exception:
+        return None
 
 
-@torch.inference_mode()
-def predict_llm_v2(headline, body):
-    result = load_llm_v2()
-    if result is None:
+def parse_deepseek_response(content: str):
+    content = content.strip()
+    matches = re.findall(r"\{.*?\}", content, re.DOTALL)
+    if matches:
+        for m in reversed(matches):
+            try:
+                data = json.loads(m)
+                for k in data:
+                    if k.lower() in ("label", "is_true", "is_real", "class", "result"):
+                        raw = data[k]
+                        if isinstance(raw, bool):
+                            return int(raw), float(_conf_to_num(data.get("confidence", "medium")))
+                        if isinstance(raw, (int, float)):
+                            return int(bool(int(raw))), float(_conf_to_num(data.get("confidence", "medium")))
+                        s = str(raw).strip().lower()
+                        label = 1 if s in ("1", "true", "real", "правда") else 0
+                        return label, float(_conf_to_num(data.get("confidence", "medium")))
+            except Exception:
+                continue
+    return None, None
+
+
+def _conf_to_num(conf):
+    if isinstance(conf, (int, float)):
+        return float(conf)
+    s = str(conf).strip().lower()
+    return {"high": 0.95, "medium": 0.8, "low": 0.6}.get(s, 0.8)
+
+
+def predict_deepseek(headline, body):
+    client = load_deepseek_client()
+    if client is None:
         return None, None
-    tok, encoder, scaler, classifiers = result
-
-    def encode(text):
-        enc = tok(str(text).strip(), truncation=True, max_length=64, padding=True, return_tensors="pt")
-        hidden = encoder(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE)).last_hidden_state
-        mf = enc["attention_mask"].to(DEVICE).unsqueeze(-1).float()
-        return (hidden * mf).sum(1) / mf.sum(1).clamp(min=1e-9)
-
-    h_emb, b_emb = encode(headline), encode(body)
-    feats = torch.cat([h_emb, b_emb, (h_emb - b_emb).abs(), h_emb * b_emb], dim=-1).cpu().numpy()
-    feats_scaled = scaler.transform(feats)
-    probs = np.zeros(2)
-    for _, model in classifiers.items():
-        probs += model.predict_proba(feats_scaled)[0]
-    probs /= len(classifiers)
-    pred = int(np.argmax(probs))
-    return pred, float(probs[pred])
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# МОДЕЛИ: LLM V3 — ruGPT-3 + LoRA Max
-# ═════════════════════════════════════════════════════════════════════════════
-
-LLM_V3_DIR = "models/llm_v3/lora_adapter"
-
-
-@st.cache_resource
-def load_llm_v3():
-    if not os.path.exists(LLM_V3_DIR):
+    text = f"{headline}\n\n{body}"[:1500]
+    try:
+        r = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {"role": "system", "content": DS_SYSTEM_PROMPT},
+                {"role": "user", "content": f"TEXT:\n{text}\n\nClassify (return JSON):"},
+            ],
+            max_tokens=200,
+            temperature=0.0,
+            stream=False,
+        )
+        return parse_deepseek_response(r.choices[0].message.content)
+    except Exception:
         return None, None
-    from peft import PeftModel
-    tok = AutoTokenizer.from_pretrained(LLM_V3_DIR)
-    tok.padding_side = "left"
-    if tok.pad_token is None:
-        tok.pad_token = tok.eos_token
-    base = AutoModelForSequenceClassification.from_pretrained(GPT_BASE, num_labels=2)
-    base.config.pad_token_id = tok.pad_token_id
-    model = PeftModel.from_pretrained(base, LLM_V3_DIR).merge_and_unload().to(DEVICE)
-    model.eval()
-    return tok, model
-
-
-@torch.no_grad()
-def predict_llm_v3(headline, body):
-    tok, mdl = load_llm_v3()
-    if tok is None:
-        return None, None
-    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
-    out = mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
-    probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
-    pred = int(np.argmax(probs))
-    return pred, float(probs[pred])
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -323,33 +319,29 @@ if check:
         for model, name in [(w2v_lr, "LR + Word2Vec"), (w2v_rf, "RF + Word2Vec")]:
             pred, conf = predict_w2v(headline, body, model)
             if pred is not None:
-                all_results.append((name, "Word2Vec", pred, conf))
+                all_results.append((name, "Классические", pred, conf))
 
     # TF-IDF
     if tfidf_vec is not None:
         for model, name in [(tfidf_lr, "LR + TF-IDF"), (tfidf_nb, "NB + TF-IDF"), (tfidf_rf, "RF + TF-IDF")]:
             pred, conf = predict_tfidf(headline, body, model)
-            all_results.append((name, "TF-IDF", pred, conf))
+            all_results.append((name, "Классические", pred, conf))
 
     # RuBERT
     if rubert_tok is not None:
         pred, conf = predict_rubert(headline, body)
         all_results.append(("RuBERT", "Трансформер", pred, conf))
 
-    # LLM V1
-    pred, conf = predict_llm_v1(headline, body)
+    # ruGPT-3 + LoRA
+    pred, conf = predict_rugpt_lora(headline, body)
     if pred is not None:
-        all_results.append(("ruGPT-3 + LoRA (V1)", "LLM", pred, conf))
+        all_results.append(("ruGPT-3 + LoRA", "LLM (локальная)", pred, conf))
 
-    # LLM V2
-    pred, conf = predict_llm_v2(headline, body)
+    # DeepSeek API
+    with st.spinner("Запрос к DeepSeek API..."):
+        pred, conf = predict_deepseek(headline, body)
     if pred is not None:
-        all_results.append(("Frozen GPT + Sklearn (V2)", "LLM", pred, conf))
-
-    # LLM V3
-    pred, conf = predict_llm_v3(headline, body)
-    if pred is not None:
-        all_results.append(("ruGPT-3 + LoRA Max (V3)", "LLM", pred, conf))
+        all_results.append(("DeepSeek (API)", "LLM (API)", pred, conf))
 
     # Вывод результатов
     if not all_results:
@@ -410,7 +402,7 @@ st.markdown(
     "на чём обучались модели и какие результаты они показали."
 )
 
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     if st.button("Классические модели", use_container_width=True):
         st.switch_page("pages/1_classical.py")
@@ -418,5 +410,8 @@ with c2:
     if st.button("RuBERT", use_container_width=True):
         st.switch_page("pages/2_rubert.py")
 with c3:
-    if st.button("LLM-подходы", use_container_width=True):
-        st.switch_page("pages/3_llm.py")
+    if st.button("ruGPT-3 + LoRA", use_container_width=True):
+        st.switch_page("pages/3_rugpt_lora.py")
+with c4:
+    if st.button("DeepSeek API", use_container_width=True):
+        st.switch_page("pages/4_deepseek.py")

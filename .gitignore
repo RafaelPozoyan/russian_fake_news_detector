@@ -24,3 +24,10 @@ notebooks/rubert/train_rubert_nli_factcheck.ipynb
 models/rubert-tiny2/
 
 # utils
+
+# Конфиденциальные данные
+.env
+.env.local
+
+# Архив неиспользуемых файлов
+trash/

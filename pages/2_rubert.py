@@ -1,7 +1,7 @@
 import os
 import json
 import streamlit as st
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparison_section
+from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
 
 st.set_page_config(page_title="RuBERT", layout="wide")
 inject_css()
@@ -118,4 +118,4 @@ with c2:
 
 # ── Сравнение с другими подходами ────────────────────────────────────────────
 
-render_comparison_section()
+render_comparsion_section()

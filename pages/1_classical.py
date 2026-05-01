@@ -1,7 +1,7 @@
 import os
 import json
 import streamlit as st
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparison_section
+from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
 
 st.set_page_config(page_title="Классические модели", layout="wide")
 inject_css()
@@ -69,8 +69,8 @@ if metrics_tfidf:
 else:
     st.info("Метрики TF-IDF не найдены.")
 
-if os.path.exists("assets/models_scores.png"):
-    st.image("assets/models_scores.png", caption="Сравнение моделей на TF-IDF признаках")
+if os.path.exists("assets/classical_comparsion_tfidf.png"):
+    st.image("assets/classical_comparsion_tfidf.png", caption="Сравнение моделей на TF-IDF признаках")
 
 # ── Word2Vec ─────────────────────────────────────────────────────────────────
 
@@ -119,8 +119,8 @@ if metrics_w2v:
 else:
     st.info("Метрики Word2Vec не найдены.")
 
-if os.path.exists("assets/models_scores_w2v.png"):
-    st.image("assets/models_scores_w2v.png", caption="Сравнение моделей на Word2Vec признаках")
+if os.path.exists("assets/classical_comparsion_w2v.png"):
+    st.image("assets/classical_comparsion_w2v.png", caption="Сравнение моделей на Word2Vec признаках")
 
 # ── Визуализации ─────────────────────────────────────────────────────────────
 
@@ -148,4 +148,4 @@ st.markdown(
 
 # ── Сравнение с другими подходами ────────────────────────────────────────────
 
-render_comparison_section()
+render_comparsion_section()
