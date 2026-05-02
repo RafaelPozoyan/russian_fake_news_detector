@@ -1,5 +1,6 @@
 .venv
 .devcontainer
+.devcontainer\devcontainer.json
 __pycache__
 .claude
 *.tmp
