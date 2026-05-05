@@ -1,7 +1,13 @@
 import os
 import json
 import streamlit as st
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
+from utils.style import (
+    inject_css,
+    sidebar_nav,
+    render_metric_row,
+    back_to_main,
+    render_comparsion_section,
+)
 
 st.set_page_config(page_title="RuBERT", layout="wide")
 inject_css()
@@ -71,12 +77,20 @@ st.markdown("---")
 st.markdown("## Результаты")
 
 if rubert_metrics:
-    render_metric_row({
-        "Accuracy": rubert_metrics.get("test_acc", rubert_metrics.get("accuracy", 0)),
-        "F1": rubert_metrics.get("test_f1", rubert_metrics.get("f1", 0)),
-        "Precision": rubert_metrics.get("test_precision", rubert_metrics.get("precision", 0)),
-        "Recall": rubert_metrics.get("test_recall", rubert_metrics.get("recall", 0)),
-    })
+    render_metric_row(
+        {
+            "Accuracy": rubert_metrics.get(
+                "test_acc", rubert_metrics.get("accuracy", 0)
+            ),
+            "F1": rubert_metrics.get("test_f1", rubert_metrics.get("f1", 0)),
+            "Precision": rubert_metrics.get(
+                "test_precision", rubert_metrics.get("precision", 0)
+            ),
+            "Recall": rubert_metrics.get(
+                "test_recall", rubert_metrics.get("recall", 0)
+            ),
+        }
+    )
 
     st.markdown(
         "RuBERT достигает точности **~97%** на тестовой выборке — это лучший результат "

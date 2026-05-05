@@ -1,3 +1,22 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:8b171095ff7f8044bdb7e485b1f4cd5af0f68eb8af1668befea7ef2b5ec1ff59
-size 576
+{
+    "logisticregression": {
+        "val_accuracy": 0.9115646258503401,
+        "val_f1": 0.911562806800657,
+        "best_params": {
+            "C": 5,
+            "class_weight": null,
+            "max_iter": 500,
+            "solver": "lbfgs"
+        }
+    },
+    "randomforest": {
+        "val_accuracy": 0.9183673469387755,
+        "val_f1": 0.9183379573027368,
+        "best_params": {
+            "class_weight": "balanced",
+            "max_depth": 20,
+            "min_samples_split": 2,
+            "n_estimators": 100
+        }
+    }
+}

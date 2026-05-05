@@ -1,3 +1,29 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:317171006ae775196ed7c578fb2a853effce1ebe3ba866e364329ee2abf365b3
-size 742
+{
+    "logistic_regression": {
+        "val_acc": 0.9968265820421878,
+        "val_f1": 0.9968285438038411,
+        "best_params": {
+            "C": 5,
+            "class_weight": null,
+            "max_iter": 500,
+            "solver": "liblinear"
+        }
+    },
+    "naive_bayes": {
+        "val_acc": 0.9854396117229792,
+        "val_f1": 0.9854574098968926,
+        "best_params": {
+            "alpha": 0.01
+        }
+    },
+    "random_forest": {
+        "val_acc": 0.997013253686765,
+        "val_f1": 0.9970138262664515,
+        "best_params": {
+            "class_weight": "balanced",
+            "max_depth": null,
+            "min_samples_split": 10,
+            "n_estimators": 200
+        }
+    }
+}

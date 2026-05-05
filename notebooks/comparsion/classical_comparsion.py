@@ -11,8 +11,13 @@ import nltk
 from gensim.models import KeyedVectors
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score,
-    confusion_matrix, roc_curve, auc,
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    confusion_matrix,
+    roc_curve,
+    auc,
 )
 
 warnings.filterwarnings("ignore")
@@ -25,6 +30,7 @@ ASSETS = "assets"
 
 nltk.download("stopwords", quiet=True)
 from nltk.corpus import stopwords
+
 STOPWORDS = set(stopwords.words("russian"))
 
 
@@ -49,7 +55,9 @@ df = df[(df["headline_clean"] != "") & (df["body_clean"] != "")]
 df["label"] = pd.to_numeric(df["label"], errors="coerce").astype(int)
 df = df.reset_index(drop=True)
 
-_, test_df = train_test_split(df, test_size=0.1, random_state=SEED, stratify=df["label"])
+_, test_df = train_test_split(
+    df, test_size=0.1, random_state=SEED, stratify=df["label"]
+)
 test_df = test_df.reset_index(drop=True)
 
 y_true = test_df["label"].values
@@ -94,16 +102,25 @@ for h, b in zip(h_clean, b_clean):
     btoks = b.split()[:150]
     h_vec = doc_vector(htoks, kv)
     b_vec = doc_vector(btoks, kv)
-    cos = float(np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8))
+    cos = float(
+        np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8)
+    )
     jacc = len(set(htoks) & set(btoks)) / max(1, len(set(htoks) | set(btoks)))
     ovr = len(set(htoks) & set(btoks)) / max(1, len(set(htoks)))
     l2 = float(np.linalg.norm(h_vec - b_vec))
-    feats.append(np.hstack([h_vec, b_vec, np.abs(h_vec - b_vec), h_vec * b_vec, [cos, jacc, ovr, l2]]))
+    feats.append(
+        np.hstack(
+            [h_vec, b_vec, np.abs(h_vec - b_vec), h_vec * b_vec, [cos, jacc, ovr, l2]]
+        )
+    )
 
 X_w2v = np.array(feats)
 
 w2v_models = {
-    "Логистическая\nрегрессия": (lr_w2v.predict(X_w2v), lr_w2v.predict_proba(X_w2v)[:, 1]),
+    "Логистическая\nрегрессия": (
+        lr_w2v.predict(X_w2v),
+        lr_w2v.predict_proba(X_w2v)[:, 1],
+    ),
     "Случайный лес": (rf_w2v.predict(X_w2v), rf_w2v.predict_proba(X_w2v)[:, 1]),
 }
 
@@ -116,27 +133,50 @@ def plot_group(models, title, out_path):
     ax_metrics = fig.add_subplot(gs[0, :2])
     rows = []
     for name, (preds, _) in models.items():
-        rows.append({
-            "Модель": name.replace("\n", " "),
-            "Accuracy": accuracy_score(y_true, preds),
-            "F1": f1_score(y_true, preds, average="weighted"),
-            "Precision": precision_score(y_true, preds, average="weighted", zero_division=0),
-            "Recall": recall_score(y_true, preds, average="weighted", zero_division=0),
-        })
+        rows.append(
+            {
+                "Модель": name.replace("\n", " "),
+                "Accuracy": accuracy_score(y_true, preds),
+                "F1": f1_score(y_true, preds, average="weighted"),
+                "Precision": precision_score(
+                    y_true, preds, average="weighted", zero_division=0
+                ),
+                "Recall": recall_score(
+                    y_true, preds, average="weighted", zero_division=0
+                ),
+            }
+        )
     metrics_df = pd.DataFrame(rows).set_index("Модель")
 
     metric_cols = ["Accuracy", "F1", "Precision", "Recall"]
-    rus_labels = {"Accuracy": "Точность", "F1": "F1-мера", "Precision": "Precision", "Recall": "Recall"}
+    rus_labels = {
+        "Accuracy": "Точность",
+        "F1": "F1-мера",
+        "Precision": "Precision",
+        "Recall": "Recall",
+    }
     x = np.arange(len(metrics_df))
     width = 0.2
     palette = ["#2E86AB", "#A23B72", "#F18F01", "#3FA34D"]
 
     for i, col in enumerate(metric_cols):
-        bars = ax_metrics.bar(x + i * width, metrics_df[col], width, label=rus_labels[col], color=palette[i])
+        bars = ax_metrics.bar(
+            x + i * width,
+            metrics_df[col],
+            width,
+            label=rus_labels[col],
+            color=palette[i],
+        )
         for bar in bars:
             v = bar.get_height()
-            ax_metrics.text(bar.get_x() + bar.get_width() / 2, v + 0.005, f"{v:.3f}",
-                            ha="center", va="bottom", fontsize=8)
+            ax_metrics.text(
+                bar.get_x() + bar.get_width() / 2,
+                v + 0.005,
+                f"{v:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
 
     ax_metrics.set_xticks(x + width * 1.5)
     ax_metrics.set_xticklabels(metrics_df.index)
@@ -150,8 +190,13 @@ def plot_group(models, title, out_path):
     for (name, (_, probs)), color in zip(models.items(), palette):
         fpr, tpr, _ = roc_curve(y_true, probs)
         roc_auc = auc(fpr, tpr)
-        ax_roc.plot(fpr, tpr, color=color, linewidth=2,
-                    label=f"{name.replace(chr(10), ' ')} (AUC={roc_auc:.3f})")
+        ax_roc.plot(
+            fpr,
+            tpr,
+            color=color,
+            linewidth=2,
+            label=f"{name.replace(chr(10), ' ')} (AUC={roc_auc:.3f})",
+        )
     ax_roc.plot([0, 1], [0, 1], "k--", alpha=0.3, linewidth=1)
     ax_roc.set_xlabel("Доля ложных срабатываний (FPR)")
     ax_roc.set_ylabel("Доля верных срабатываний (TPR)")
@@ -162,12 +207,21 @@ def plot_group(models, title, out_path):
     for i, (name, (preds, _)) in enumerate(models.items()):
         ax_cm = fig.add_subplot(gs[1, i])
         cm = confusion_matrix(y_true, preds)
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax_cm,
-                    xticklabels=["Фейк", "Реальная"],
-                    yticklabels=["Фейк", "Реальная"],
-                    cbar=False, annot_kws={"size": 12})
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            ax=ax_cm,
+            xticklabels=["Фейк", "Реальная"],
+            yticklabels=["Фейк", "Реальная"],
+            cbar=False,
+            annot_kws={"size": 12},
+        )
         acc = accuracy_score(y_true, preds)
-        ax_cm.set_title(f"{name.replace(chr(10), ' ')}\n(Точность {acc:.3f})", fontsize=10)
+        ax_cm.set_title(
+            f"{name.replace(chr(10), ' ')}\n(Точность {acc:.3f})", fontsize=10
+        )
         ax_cm.set_xlabel("Предсказание")
         ax_cm.set_ylabel("Истина")
 
@@ -178,11 +232,17 @@ def plot_group(models, title, out_path):
 
 
 print("Отрисовка TF-IDF")
-plot_group(tfidf_models, "Сравнение классических моделей на TF-IDF признаках",
-           os.path.join(ASSETS, "classical_comparsion_tfidf.png"))
+plot_group(
+    tfidf_models,
+    "Сравнение классических моделей на TF-IDF признаках",
+    os.path.join(ASSETS, "classical_comparsion_tfidf.png"),
+)
 
 print("Отрисовка Word2Vec")
-plot_group(w2v_models, "Сравнение классических моделей на Word2Vec признаках",
-           os.path.join(ASSETS, "classical_comparsion_w2v.png"))
+plot_group(
+    w2v_models,
+    "Сравнение классических моделей на Word2Vec признаках",
+    os.path.join(ASSETS, "classical_comparsion_w2v.png"),
+)
 
 print("Готово")

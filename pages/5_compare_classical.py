@@ -39,12 +39,14 @@ for name, key in [
 ]:
     if key in m_tfidf:
         d = m_tfidf[key]
-        rows.append({
-            "Модель": name,
-            "Векторизация": "TF-IDF",
-            "Accuracy": d.get("val_acc", 0),
-            "F1": d.get("val_f1", 0),
-        })
+        rows.append(
+            {
+                "Модель": name,
+                "Векторизация": "TF-IDF",
+                "Accuracy": d.get("val_acc", 0),
+                "F1": d.get("val_f1", 0),
+            }
+        )
 
 m_w2v = load_json("results/metrics/metrics_w2v.json")
 for name, key in [
@@ -53,18 +55,24 @@ for name, key in [
 ]:
     if key in m_w2v:
         d = m_w2v[key]
-        rows.append({
-            "Модель": name,
-            "Векторизация": "Word2Vec",
-            "Accuracy": d.get("val_accuracy", 0),
-            "F1": d.get("val_f1", d.get("f1", 0)),
-        })
+        rows.append(
+            {
+                "Модель": name,
+                "Векторизация": "Word2Vec",
+                "Accuracy": d.get("val_accuracy", 0),
+                "F1": d.get("val_f1", d.get("f1", 0)),
+            }
+        )
 
 if rows:
     st.markdown("---")
     st.markdown("## Метрики на валидационной выборке")
 
-    df = pd.DataFrame(rows).sort_values("Accuracy", ascending=False).reset_index(drop=True)
+    df = (
+        pd.DataFrame(rows)
+        .sort_values("Accuracy", ascending=False)
+        .reset_index(drop=True)
+    )
     df.index = range(1, len(df) + 1)
 
     best = df.iloc[0]

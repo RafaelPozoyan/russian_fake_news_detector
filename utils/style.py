@@ -1,4 +1,5 @@
 """Общие стили и утилиты для всех страниц."""
+
 import streamlit as st
 import json
 import os
@@ -10,7 +11,8 @@ DANGER = "#E74C3C"
 
 def inject_css():
     """Минимальный общий CSS для всего сайта."""
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     /* Карточки */
     .card {
@@ -98,7 +100,9 @@ def inject_css():
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_metric_row(metrics: dict):
@@ -110,7 +114,7 @@ def render_metric_row(metrics: dict):
         else:
             val_str = str(value)
         html += f'<div class="metric-box"><div class="label">{label}</div><div class="val">{val_str}</div></div>'
-    html += '</div>'
+    html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
 
@@ -119,7 +123,11 @@ def render_prediction(label: int, confidence: float, model_name: str = ""):
     cls = "result-fake" if label == 0 else "result-real"
     text = "Фейк" if label == 0 else "Достоверная"
     color = DANGER if label == 0 else SUCCESS
-    prefix = f"<div style='font-size:0.8rem;color:#888;margin-bottom:0.2rem;'>{model_name}</div>" if model_name else ""
+    prefix = (
+        f"<div style='font-size:0.8rem;color:#888;margin-bottom:0.2rem;'>{model_name}</div>"
+        if model_name
+        else ""
+    )
     st.markdown(
         f'<div class="{cls}">{prefix}'
         f'<div class="result-label" style="color:{color};">{text}</div>'
@@ -153,7 +161,9 @@ def sidebar_nav():
 
         st.markdown("**Сравнения**")
         st.page_link("pages/5_compare_classical.py", label="Классические между собой")
-        st.page_link("pages/6_compare_rugpt_rubert.py", label="ruGPT-3 + LoRA vs RuBERT")
+        st.page_link(
+            "pages/6_compare_rugpt_rubert.py", label="ruGPT-3 + LoRA vs RuBERT"
+        )
         st.page_link("pages/7_compare_rubert_deepseek.py", label="RuBERT vs DeepSeek")
         st.page_link("pages/8_compare_all.py", label="Все модели")
 
@@ -174,8 +184,14 @@ def render_comparsion_section():
     st.markdown("---")
     st.markdown("## Сравнение с другими подходами")
     if os.path.exists("assets/final_comparsion_accuracy_f1.png"):
-        st.image("assets/final_comparsion_accuracy_f1.png", caption="Сравнение всех моделей по Accuracy и F1")
+        st.image(
+            "assets/final_comparsion_accuracy_f1.png",
+            caption="Сравнение всех моделей по Accuracy и F1",
+        )
     elif os.path.exists("assets/complete_models_comparsion.png"):
-        st.image("assets/complete_models_comparsion.png", caption="Сравнение всех моделей по Accuracy и F1")
+        st.image(
+            "assets/complete_models_comparsion.png",
+            caption="Сравнение всех моделей по Accuracy и F1",
+        )
     if st.button("Подробное сравнение всех моделей →", key="_compare_link"):
         st.switch_page("pages/8_compare_all.py")

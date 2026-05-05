@@ -40,14 +40,16 @@ for name, key in [
 ]:
     if key in m_tfidf:
         d = m_tfidf[key]
-        rows.append({
-            "Модель": name,
-            "Категория": "Классическая",
-            "Accuracy": d.get("val_acc", 0),
-            "F1": d.get("val_f1", 0),
-            "Precision": d.get("precision", d.get("val_precision", 0)),
-            "Recall": d.get("recall", d.get("val_recall", 0)),
-        })
+        rows.append(
+            {
+                "Модель": name,
+                "Категория": "Классическая",
+                "Accuracy": d.get("val_acc", 0),
+                "F1": d.get("val_f1", 0),
+                "Precision": d.get("precision", d.get("val_precision", 0)),
+                "Recall": d.get("recall", d.get("val_recall", 0)),
+            }
+        )
 
 # Word2Vec
 m_w2v = load_json("results/metrics/metrics_w2v.json")
@@ -57,55 +59,67 @@ for name, key in [
 ]:
     if key in m_w2v:
         d = m_w2v[key]
-        rows.append({
-            "Модель": name,
-            "Категория": "Классическая",
-            "Accuracy": d.get("val_accuracy", 0),
-            "F1": d.get("val_f1", d.get("f1", 0)),
-            "Precision": d.get("precision", 0),
-            "Recall": d.get("recall", 0),
-        })
+        rows.append(
+            {
+                "Модель": name,
+                "Категория": "Классическая",
+                "Accuracy": d.get("val_accuracy", 0),
+                "F1": d.get("val_f1", d.get("f1", 0)),
+                "Precision": d.get("precision", 0),
+                "Recall": d.get("recall", 0),
+            }
+        )
 
 # RuBERT
 m_rb = load_json("models/rubert/metrics.json")
 rb = m_rb.get("rubert", {})
 if rb:
-    rows.append({
-        "Модель": "RuBERT",
-        "Категория": "Трансформер",
-        "Accuracy": rb.get("test_acc", 0),
-        "F1": rb.get("test_f1", 0),
-        "Precision": rb.get("test_precision", 0),
-        "Recall": rb.get("test_recall", 0),
-    })
+    rows.append(
+        {
+            "Модель": "RuBERT",
+            "Категория": "Трансформер",
+            "Accuracy": rb.get("test_acc", 0),
+            "F1": rb.get("test_f1", 0),
+            "Precision": rb.get("test_precision", 0),
+            "Recall": rb.get("test_recall", 0),
+        }
+    )
 
 # ruGPT-3 + LoRA
 m_rugpt = load_json("models/llm_v3_tuned/metrics.json")
 rugpt = m_rugpt.get("test", {})
 if rugpt:
-    rows.append({
-        "Модель": "ruGPT-3 + LoRA",
-        "Категория": "LLM (локальная)",
-        "Accuracy": rugpt.get("accuracy", 0),
-        "F1": rugpt.get("f1", 0),
-        "Precision": rugpt.get("precision", 0),
-        "Recall": rugpt.get("recall", 0),
-    })
+    rows.append(
+        {
+            "Модель": "ruGPT-3 + LoRA",
+            "Категория": "LLM (локальная)",
+            "Accuracy": rugpt.get("accuracy", 0),
+            "F1": rugpt.get("f1", 0),
+            "Precision": rugpt.get("precision", 0),
+            "Recall": rugpt.get("recall", 0),
+        }
+    )
 
 # DeepSeek
-for path in ("models/deepseek/predictions_441_v4.csv", "models/deepseek/predictions_441_v3.csv"):
+for path in (
+    "models/deepseek/predictions_441_v5.csv",
+    "models/deepseek/predictions_441_v4.csv",
+    "models/deepseek/predictions_441_v3.csv",
+):
     if os.path.exists(path):
         df = pd.read_csv(path)
         if {"true_label", "pred"}.issubset(df.columns):
             y_t, y_p = df["true_label"].values, df["pred"].values
-            rows.append({
-                "Модель": "DeepSeek (API)",
-                "Категория": "LLM (API)",
-                "Accuracy": accuracy_score(y_t, y_p),
-                "F1": f1_score(y_t, y_p, average="weighted"),
-                "Precision": precision_score(y_t, y_p, average="weighted"),
-                "Recall": recall_score(y_t, y_p, average="weighted"),
-            })
+            rows.append(
+                {
+                    "Модель": "DeepSeek (API)",
+                    "Категория": "LLM (API)",
+                    "Accuracy": accuracy_score(y_t, y_p),
+                    "F1": f1_score(y_t, y_p, average="weighted"),
+                    "Precision": precision_score(y_t, y_p, average="weighted"),
+                    "Recall": recall_score(y_t, y_p, average="weighted"),
+                }
+            )
             break
 
 # ── Таблица ──────────────────────────────────────────────────────────────────
@@ -114,7 +128,11 @@ if rows:
     st.markdown("---")
     st.markdown("## Сводная таблица")
 
-    df = pd.DataFrame(rows).sort_values("Accuracy", ascending=False).reset_index(drop=True)
+    df = (
+        pd.DataFrame(rows)
+        .sort_values("Accuracy", ascending=False)
+        .reset_index(drop=True)
+    )
     df.index = range(1, len(df) + 1)
 
     best_model = df.iloc[0]["Модель"]
@@ -135,7 +153,10 @@ st.markdown("## Визуализация")
 
 img_paths = [
     ("assets/final_comparsion_accuracy_f1.png", "Сравнение моделей по Accuracy и F1"),
-    ("assets/final_comparsion_4metrics.png", "Все четыре метрики в одном представлении"),
+    (
+        "assets/final_comparsion_4metrics.png",
+        "Все четыре метрики в одном представлении",
+    ),
     ("assets/final_comparsion_cm.png", "Матрицы ошибок всех моделей"),
     ("assets/final_comparsion_roc.png", "ROC-кривые"),
 ]

@@ -35,6 +35,7 @@ test_df = test_stances.merge(test_bodies, on="Body ID", how="left")
 def load_stopwords():
     nltk.download("stopwords", quiet=True)
     from nltk.corpus import stopwords
+
     return set(stopwords.words("russian"))
 
 
@@ -57,11 +58,24 @@ def preprocess_text(text):
 # МОДЕЛИ: Word2Vec
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 @st.cache_resource
 def load_w2v():
-    kv = KeyedVectors.load("models/w2v_vectors.kv") if os.path.exists("models/w2v_vectors.kv") else None
-    lr = pickle.load(open("models/logisticregression_model.pkl", "rb")) if os.path.exists("models/logisticregression_model.pkl") else None
-    rf = pickle.load(open("models/randomforest_model.pkl", "rb")) if os.path.exists("models/randomforest_model.pkl") else None
+    kv = (
+        KeyedVectors.load("models/w2v_vectors.kv")
+        if os.path.exists("models/w2v_vectors.kv")
+        else None
+    )
+    lr = (
+        pickle.load(open("models/logisticregression_model.pkl", "rb"))
+        if os.path.exists("models/logisticregression_model.pkl")
+        else None
+    )
+    rf = (
+        pickle.load(open("models/randomforest_model.pkl", "rb"))
+        if os.path.exists("models/randomforest_model.pkl")
+        else None
+    )
     return kv, lr, rf
 
 
@@ -70,7 +84,11 @@ w2v_kv, w2v_lr, w2v_rf = load_w2v()
 
 def doc_vector(tokens, kv_model):
     vecs = [kv_model[w] for w in tokens if w in kv_model]
-    return np.vstack(vecs).mean(axis=0) if vecs else np.zeros(kv_model.vector_size, dtype=np.float32)
+    return (
+        np.vstack(vecs).mean(axis=0)
+        if vecs
+        else np.zeros(kv_model.vector_size, dtype=np.float32)
+    )
 
 
 def predict_w2v(headline, body, model):
@@ -80,15 +98,25 @@ def predict_w2v(headline, body, model):
         return None, None
     htoks, btoks = h_clean.split()[:150], b_clean.split()[:150]
     h_vec, b_vec = doc_vector(htoks, w2v_kv), doc_vector(btoks, w2v_kv)
-    cos_sim = float(np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8))
+    cos_sim = float(
+        np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8)
+    )
     jacc = len(set(htoks) & set(btoks)) / max(1, len(set(htoks) | set(btoks)))
     ovr = len(set(htoks) & set(btoks)) / max(1, len(set(htoks)))
     l2 = float(np.linalg.norm(h_vec - b_vec))
-    feats = np.hstack([h_vec, b_vec, np.abs(h_vec - b_vec), h_vec * b_vec, [cos_sim, jacc, ovr, l2]]).reshape(1, -1)
+    feats = np.hstack(
+        [h_vec, b_vec, np.abs(h_vec - b_vec), h_vec * b_vec, [cos_sim, jacc, ovr, l2]]
+    ).reshape(1, -1)
     prob = model.predict_proba(feats)[0]
     if cos_sim < 0.10 or ovr <= 0.00:
         return 0, max(prob[0], 0.7)
-    if prob[1] >= 0.55 and cos_sim >= 0.20 and jacc >= 0.005 and ovr >= 0.10 and l2 <= 14.0:
+    if (
+        prob[1] >= 0.55
+        and cos_sim >= 0.20
+        and jacc >= 0.005
+        and ovr >= 0.10
+        and l2 <= 14.0
+    ):
         return 1, prob[1]
     return 0, max(prob[0], 0.5)
 
@@ -96,6 +124,7 @@ def predict_w2v(headline, body, model):
 # ═════════════════════════════════════════════════════════════════════════════
 # МОДЕЛИ: TF-IDF
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @st.cache_resource
 def load_tfidf():
@@ -143,8 +172,17 @@ rubert_tok, rubert_mdl = load_rubert()
 
 @torch.no_grad()
 def predict_rubert(headline, body):
-    enc = rubert_tok(f"{headline} {body}", truncation=True, padding="max_length", max_length=256, return_tensors="pt")
-    out = rubert_mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
+    enc = rubert_tok(
+        f"{headline} {body}",
+        truncation=True,
+        padding="max_length",
+        max_length=256,
+        return_tensors="pt",
+    )
+    out = rubert_mdl(
+        input_ids=enc["input_ids"].to(DEVICE),
+        attention_mask=enc["attention_mask"].to(DEVICE),
+    )
     probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
     pred = int(np.argmax(probs))
     return pred, float(probs[pred])
@@ -163,13 +201,16 @@ def load_rugpt_lora():
     if not os.path.exists(RUGPT_LORA_DIR):
         return None, None
     from peft import PeftModel
+
     tok = AutoTokenizer.from_pretrained(RUGPT_LORA_DIR)
     tok.padding_side = "left"
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     base = AutoModelForSequenceClassification.from_pretrained(GPT_BASE, num_labels=2)
     base.config.pad_token_id = tok.pad_token_id
-    model = PeftModel.from_pretrained(base, RUGPT_LORA_DIR).merge_and_unload().to(DEVICE)
+    model = (
+        PeftModel.from_pretrained(base, RUGPT_LORA_DIR).merge_and_unload().to(DEVICE)
+    )
     model.eval()
     return tok, model
 
@@ -179,8 +220,17 @@ def predict_rugpt_lora(headline, body):
     tok, mdl = load_rugpt_lora()
     if tok is None:
         return None, None
-    enc = tok(f"{headline} | {body}", truncation=True, padding="max_length", max_length=512, return_tensors="pt")
-    out = mdl(input_ids=enc["input_ids"].to(DEVICE), attention_mask=enc["attention_mask"].to(DEVICE))
+    enc = tok(
+        f"{headline} | {body}",
+        truncation=True,
+        padding="max_length",
+        max_length=512,
+        return_tensors="pt",
+    )
+    out = mdl(
+        input_ids=enc["input_ids"].to(DEVICE),
+        attention_mask=enc["attention_mask"].to(DEVICE),
+    )
     probs = torch.softmax(out.logits, dim=1).cpu().numpy()[0]
     pred = int(np.argmax(probs))
     return pred, float(probs[pred])
@@ -209,6 +259,7 @@ def load_deepseek_client():
         return None
     try:
         from openai import OpenAI
+
         return OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
     except Exception:
         return None
@@ -225,12 +276,18 @@ def parse_deepseek_response(content: str):
                     if k.lower() in ("label", "is_true", "is_real", "class", "result"):
                         raw = data[k]
                         if isinstance(raw, bool):
-                            return int(raw), float(_conf_to_num(data.get("confidence", "medium")))
+                            return int(raw), float(
+                                _conf_to_num(data.get("confidence", "medium"))
+                            )
                         if isinstance(raw, (int, float)):
-                            return int(bool(int(raw))), float(_conf_to_num(data.get("confidence", "medium")))
+                            return int(bool(int(raw))), float(
+                                _conf_to_num(data.get("confidence", "medium"))
+                            )
                         s = str(raw).strip().lower()
                         label = 1 if s in ("1", "true", "real", "правда") else 0
-                        return label, float(_conf_to_num(data.get("confidence", "medium")))
+                        return label, float(
+                            _conf_to_num(data.get("confidence", "medium"))
+                        )
             except Exception:
                 continue
     return None, None
@@ -248,20 +305,20 @@ def predict_deepseek(headline, body):
     if client is None:
         return None, None
     text = f"{headline}\n\n{body}"[:1500]
-    try:
-        r = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": DS_SYSTEM_PROMPT},
-                {"role": "user", "content": f"TEXT:\n{text}\n\nClassify (return JSON):"},
-            ],
-            max_tokens=200,
-            temperature=0.0,
-            stream=False,
-        )
-        return parse_deepseek_response(r.choices[0].message.content)
-    except Exception:
-        return None, None
+    r = client.chat.completions.create(
+        model=DEEPSEEK_MODEL,
+        messages=[
+            {"role": "system", "content": DS_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"TEXT:\n{text}\n\nClassify (return JSON):",
+            },
+        ],
+        max_tokens=200,
+        temperature=0.0,
+        stream=False,
+    )
+    return parse_deepseek_response(r.choices[0].message.content)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -290,8 +347,12 @@ def clear_fields():
     st.session_state.body = ""
 
 
-headline = st.text_input("Заголовок", placeholder="Введите заголовок новости", key="headline")
-body = st.text_area("Текст статьи", height=180, placeholder="Введите текст статьи", key="body")
+headline = st.text_input(
+    "Заголовок", placeholder="Введите заголовок новости", key="headline"
+)
+body = st.text_area(
+    "Текст статьи", height=180, placeholder="Введите текст статьи", key="body"
+)
 
 c1, c2, c3 = st.columns([1, 1, 2])
 with c1:
@@ -323,7 +384,11 @@ if check:
 
     # TF-IDF
     if tfidf_vec is not None:
-        for model, name in [(tfidf_lr, "LR + TF-IDF"), (tfidf_nb, "NB + TF-IDF"), (tfidf_rf, "RF + TF-IDF")]:
+        for model, name in [
+            (tfidf_lr, "LR + TF-IDF"),
+            (tfidf_nb, "NB + TF-IDF"),
+            (tfidf_rf, "RF + TF-IDF"),
+        ]:
             pred, conf = predict_tfidf(headline, body, model)
             all_results.append((name, "Классические", pred, conf))
 
@@ -377,18 +442,28 @@ if check:
 
     st.markdown("#### Итоговый вердикт")
     if real_count > fake_count:
-        st.success(f"**Достоверная новость** — {real_count} из {total} моделей считают новость настоящей")
+        st.success(
+            f"**Достоверная новость** — {real_count} из {total} моделей считают новость настоящей"
+        )
     elif fake_count > real_count:
         st.error(f"**Фейк** — {fake_count} из {total} моделей считают новость фейковой")
     else:
-        st.warning(f"**Мнения разделились** — {real_count} за, {fake_count} против из {total}")
+        st.warning(
+            f"**Мнения разделились** — {real_count} за, {fake_count} против из {total}"
+        )
 
     with st.expander("Подробная сводка"):
-        df = pd.DataFrame([
-            {"Модель": name, "Категория": cat, "Вердикт": "Реальная" if pred == 1 else "Фейк",
-             "Уверенность": f"{conf:.1%}"}
-            for name, cat, pred, conf in all_results
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "Модель": name,
+                    "Категория": cat,
+                    "Вердикт": "Реальная" if pred == 1 else "Фейк",
+                    "Уверенность": f"{conf:.1%}",
+                }
+                for name, cat, pred, conf in all_results
+            ]
+        )
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 # ═════════════════════════════════════════════════════════════════════════════

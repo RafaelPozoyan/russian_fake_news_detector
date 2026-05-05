@@ -38,29 +38,33 @@ rows = []
 m_rb = load_json("models/rubert/metrics.json")
 rb = m_rb.get("rubert", {})
 if rb:
-    rows.append({
-        "Модель": "RuBERT (full fine-tuning)",
-        "Параметры": "~178 млн (все обучаются)",
-        "Контекст": "256 токенов",
-        "Accuracy": rb.get("test_acc", 0),
-        "F1": rb.get("test_f1", 0),
-        "Precision": rb.get("test_precision", 0),
-        "Recall": rb.get("test_recall", 0),
-    })
+    rows.append(
+        {
+            "Модель": "RuBERT (full fine-tuning)",
+            "Параметры": "~178 млн (все обучаются)",
+            "Контекст": "256 токенов",
+            "Accuracy": rb.get("test_acc", 0),
+            "F1": rb.get("test_f1", 0),
+            "Precision": rb.get("test_precision", 0),
+            "Recall": rb.get("test_recall", 0),
+        }
+    )
 
 m_rugpt = load_json("models/llm_v3_tuned/metrics.json")
 rugpt = m_rugpt.get("test", {})
 config = m_rugpt.get("config", {})
 if rugpt:
-    rows.append({
-        "Модель": "ruGPT-3 + LoRA",
-        "Параметры": f"~125 млн (обучается ~1% через LoRA r={config.get('lora_r', 64)})",
-        "Контекст": f"{config.get('max_length', 512)} токенов",
-        "Accuracy": rugpt.get("accuracy", 0),
-        "F1": rugpt.get("f1", 0),
-        "Precision": rugpt.get("precision", 0),
-        "Recall": rugpt.get("recall", 0),
-    })
+    rows.append(
+        {
+            "Модель": "ruGPT-3 + LoRA",
+            "Параметры": f"~125 млн (обучается ~1% через LoRA r={config.get('lora_r', 64)})",
+            "Контекст": f"{config.get('max_length', 512)} токенов",
+            "Accuracy": rugpt.get("accuracy", 0),
+            "F1": rugpt.get("f1", 0),
+            "Precision": rugpt.get("precision", 0),
+            "Recall": rugpt.get("recall", 0),
+        }
+    )
 
 if rows:
     st.markdown("---")
@@ -86,8 +90,20 @@ if os.path.exists(rb_preds_path) and os.path.exists(rugpt_preds_path):
         # Унифицируем имена колонок
         def get_pred_cols(d):
             cols = d.columns.tolist()
-            true_col = next((c for c in cols if "true" in c.lower() or "label" in c.lower() and "pred" not in c.lower()), cols[0])
-            pred_col = next((c for c in cols if "pred" in c.lower()), cols[1] if len(cols) > 1 else cols[0])
+            true_col = next(
+                (
+                    c
+                    for c in cols
+                    if "true" in c.lower()
+                    or "label" in c.lower()
+                    and "pred" not in c.lower()
+                ),
+                cols[0],
+            )
+            pred_col = next(
+                (c for c in cols if "pred" in c.lower()),
+                cols[1] if len(cols) > 1 else cols[0],
+            )
             return true_col, pred_col
 
         rb_t, rb_p = get_pred_cols(rb_df)
@@ -121,17 +137,30 @@ if os.path.exists(rb_preds_path) and os.path.exists(rugpt_preds_path):
                     "Прав только RuBERT",
                     "Прав только ruGPT-3 + LoRA",
                 ],
-                "Количество": [int(both_right), int(both_wrong), int(only_rb), int(only_rugpt)],
+                "Количество": [
+                    int(both_right),
+                    int(both_wrong),
+                    int(only_rb),
+                    int(only_rugpt),
+                ],
             }
-            st.dataframe(pd.DataFrame(agreement_data), use_container_width=True, hide_index=True)
+            st.dataframe(
+                pd.DataFrame(agreement_data), use_container_width=True, hide_index=True
+            )
 
 # ── Графики ──────────────────────────────────────────────────────────────────
 
 img_paths = [
     ("assets/rubert_vs_rugpt_comparsion.csv", None),
-    ("assets/rubert_vs_rugpt_comparsion_confusion.png", "Матрицы ошибок: RuBERT и ruGPT-3 + LoRA"),
+    (
+        "assets/rubert_vs_rugpt_comparsion_confusion.png",
+        "Матрицы ошибок: RuBERT и ruGPT-3 + LoRA",
+    ),
     ("assets/rubert_vs_rugpt_comparsion_roc.png", "ROC-кривые двух моделей"),
-    ("assets/rubert_vs_rugpt_comparsion_confidence.png", "Распределение уверенности предсказаний"),
+    (
+        "assets/rubert_vs_rugpt_comparsion_confidence.png",
+        "Распределение уверенности предсказаний",
+    ),
     ("assets/rubert_vs_rugpt_comparsion_agreement.png", "Анализ согласованности"),
 ]
 images_shown = False

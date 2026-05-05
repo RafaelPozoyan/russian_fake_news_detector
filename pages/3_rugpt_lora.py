@@ -1,7 +1,13 @@
 import os
 import json
 import streamlit as st
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
+from utils.style import (
+    inject_css,
+    sidebar_nav,
+    render_metric_row,
+    back_to_main,
+    render_comparsion_section,
+)
 
 st.set_page_config(page_title="ruGPT-3 + LoRA", layout="wide")
 inject_css()
@@ -99,12 +105,14 @@ st.markdown("---")
 st.markdown("## Результаты на тестовой выборке")
 
 if test_m:
-    render_metric_row({
-        "Accuracy": test_m.get("accuracy", 0),
-        "F1": test_m.get("f1", 0),
-        "Precision": test_m.get("precision", 0),
-        "Recall": test_m.get("recall", 0),
-    })
+    render_metric_row(
+        {
+            "Accuracy": test_m.get("accuracy", 0),
+            "F1": test_m.get("f1", 0),
+            "Precision": test_m.get("precision", 0),
+            "Recall": test_m.get("recall", 0),
+        }
+    )
 
     st.markdown(
         "Дообученная ruGPT-3 показывает точность **{:.4f}** и F1 **{:.4f}**. "
@@ -112,9 +120,7 @@ if test_m:
         "обучается лишь малая доля параметров. Сильная сторона подхода — способность "
         "учитывать длинный контекст (до 512 токенов), что важно для статей, в которых "
         "ключевые расхождения между заголовком и телом возникают за пределами первых "
-        "нескольких предложений.".format(
-            test_m.get("accuracy", 0), test_m.get("f1", 0)
-        )
+        "нескольких предложений.".format(test_m.get("accuracy", 0), test_m.get("f1", 0))
     )
 else:
     st.info("Метрики не найдены — запустите ноутбук обучения.")
@@ -122,7 +128,10 @@ else:
 # ── Графики ──────────────────────────────────────────────────────────────────
 
 img_paths = [
-    ("models/llm_v3_tuned/training_history.png", "История обучения: loss и accuracy по эпохам"),
+    (
+        "models/llm_v3_tuned/training_history.png",
+        "История обучения: loss и accuracy по эпохам",
+    ),
     ("models/llm_v3_tuned/confusion_matrix.png", "Матрица ошибок на тесте"),
 ]
 for path, caption in img_paths:

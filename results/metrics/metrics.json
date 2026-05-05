@@ -1,3 +1,11 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f664544c21ef471f6a3f40bdfd22b6c1e4dab3c11605b92d4738dd57340bceed
-size 196
+{
+  "Logistic Regression": {
+    "val_acc": 0.9603174603174603
+  },
+  "Naive Bayes": {
+    "val_acc": 0.9365079365079365
+  },
+  "Random Forest": {
+    "val_acc": 0.9410430839002267
+  }
+}

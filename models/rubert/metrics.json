@@ -1,3 +1,19 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:81b1db87c33084763e105b9376790e3cf5b83a4a8cd4bcc4440de0e89b506fd1
-size 560
+{
+    "rubert": {
+        "val_acc": 0.9795918367346939,
+        "val_f1": 0.9795918367346939,
+        "test_acc": 0.981859,
+        "test_f1": 0.981859,
+        "test_precision": 0.981859,
+        "test_recall": 0.981859,
+        "best_epoch": 3,
+        "best_params": {
+            "model_name": "DeepPavlov/rubert-base-cased",
+            "max_length": 256,
+            "batch_size": 8,
+            "epochs": 4,
+            "learning_rate": 2e-05,
+            "weight_decay": 0.01
+        }
+    }
+}

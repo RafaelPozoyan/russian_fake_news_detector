@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score, confusion_matrix
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    confusion_matrix,
 )
 from utils.style import inject_css, sidebar_nav, load_json, back_to_main
 
@@ -38,20 +42,26 @@ rows = []
 m_rb = load_json("models/rubert/metrics.json")
 rb = m_rb.get("rubert", {})
 if rb:
-    rows.append({
-        "Модель": "RuBERT",
-        "Стратегия": "Полный fine-tuning на нашем train",
-        "Accuracy": rb.get("test_acc", 0),
-        "F1": rb.get("test_f1", 0),
-        "Precision": rb.get("test_precision", 0),
-        "Recall": rb.get("test_recall", 0),
-    })
+    rows.append(
+        {
+            "Модель": "RuBERT",
+            "Стратегия": "Полный fine-tuning на нашем train",
+            "Accuracy": rb.get("test_acc", 0),
+            "F1": rb.get("test_f1", 0),
+            "Precision": rb.get("test_precision", 0),
+            "Recall": rb.get("test_recall", 0),
+        }
+    )
 
 # DeepSeek — рассчитываем метрики из кэша предсказаний
 deepseek_metrics = None
 deepseek_cm = None
 deepseek_n = 0
-for path in ("models/deepseek/predictions_441_v4.csv", "models/deepseek/predictions_441_v3.csv"):
+for path in (
+    "models/deepseek/predictions_441_v5.csv",
+    "models/deepseek/predictions_441_v4.csv",
+    "models/deepseek/predictions_441_v3.csv",
+):
     if os.path.exists(path):
         df = pd.read_csv(path)
         if {"true_label", "pred"}.issubset(df.columns):
@@ -67,11 +77,13 @@ for path in ("models/deepseek/predictions_441_v4.csv", "models/deepseek/predicti
             break
 
 if deepseek_metrics:
-    rows.append({
-        "Модель": "DeepSeek (API)",
-        "Стратегия": "24-shot retrieval, без обучения",
-        **deepseek_metrics,
-    })
+    rows.append(
+        {
+            "Модель": "DeepSeek (API)",
+            "Стратегия": "24-shot retrieval, без обучения",
+            **deepseek_metrics,
+        }
+    )
 
 if rows:
     st.markdown("---")
@@ -87,7 +99,9 @@ else:
 # ── Анализ ошибок ────────────────────────────────────────────────────────────
 
 rb_preds_path = "models/rubert/test_predictions.csv"
-ds_preds_path = "models/deepseek/predictions_441_v4.csv"
+ds_preds_path = "models/deepseek/predictions_441_v5.csv"
+if not os.path.exists(ds_preds_path):
+    ds_preds_path = "models/deepseek/predictions_441_v4.csv"
 if not os.path.exists(ds_preds_path):
     ds_preds_path = "models/deepseek/predictions_441_v3.csv"
 
@@ -97,9 +111,15 @@ if os.path.exists(rb_preds_path) and os.path.exists(ds_preds_path):
 
     if len(rb_df) == len(ds_df):
         # Колонки могут различаться
-        true_rb = next((c for c in rb_df.columns if "true" in c.lower()), rb_df.columns[0])
-        pred_rb = next((c for c in rb_df.columns if "pred" in c.lower()), rb_df.columns[1])
-        pred_ds = next((c for c in ds_df.columns if "pred" in c.lower()), ds_df.columns[1])
+        true_rb = next(
+            (c for c in rb_df.columns if "true" in c.lower()), rb_df.columns[0]
+        )
+        pred_rb = next(
+            (c for c in rb_df.columns if "pred" in c.lower()), rb_df.columns[1]
+        )
+        pred_ds = next(
+            (c for c in ds_df.columns if "pred" in c.lower()), ds_df.columns[1]
+        )
 
         y_true = rb_df[true_rb].values
         rb_p = rb_df[pred_rb].values
@@ -118,28 +138,43 @@ if os.path.exists(rb_preds_path) and os.path.exists(ds_preds_path):
             f"и теоретически их предсказания можно было бы объединить в ансамбль "
             f"для улучшения общего результата."
         )
-        st.dataframe(pd.DataFrame({
-            "Категория": [
-                "Только RuBERT ошибается",
-                "Только DeepSeek ошибается",
-                "Обе модели ошибаются",
-                "Обе правы",
-            ],
-            "Количество": [
-                len(rb_wrong - ds_wrong),
-                len(ds_wrong - rb_wrong),
-                len(rb_wrong & ds_wrong),
-                len(y_true) - len(rb_wrong | ds_wrong),
-            ],
-        }), use_container_width=True, hide_index=True)
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Категория": [
+                        "Только RuBERT ошибается",
+                        "Только DeepSeek ошибается",
+                        "Обе модели ошибаются",
+                        "Обе правы",
+                    ],
+                    "Количество": [
+                        len(rb_wrong - ds_wrong),
+                        len(ds_wrong - rb_wrong),
+                        len(rb_wrong & ds_wrong),
+                        len(y_true) - len(rb_wrong | ds_wrong),
+                    ],
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 # ── Графики ──────────────────────────────────────────────────────────────────
 
 img_paths = [
-    ("assets/rubert_vs_deepseek_comparsion_confusion.png", "Матрицы ошибок: RuBERT и DeepSeek"),
+    (
+        "assets/rubert_vs_deepseek_comparsion_confusion.png",
+        "Матрицы ошибок: RuBERT и DeepSeek",
+    ),
     ("assets/rubert_vs_deepseek_comparsion_roc.png", "ROC-кривые"),
-    ("assets/rubert_vs_deepseek_comparsion_confidence.png", "Распределение уверенности"),
-    ("assets/rubert_vs_deepseek_comparsion_agreement.png", "Согласованность предсказаний"),
+    (
+        "assets/rubert_vs_deepseek_comparsion_confidence.png",
+        "Распределение уверенности",
+    ),
+    (
+        "assets/rubert_vs_deepseek_comparsion_agreement.png",
+        "Согласованность предсказаний",
+    ),
     ("assets/final_deepseek_vs_top.png", "Сравнение топовых моделей"),
 ]
 images_shown = False

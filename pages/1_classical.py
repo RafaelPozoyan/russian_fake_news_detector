@@ -1,7 +1,13 @@
 import os
 import json
 import streamlit as st
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
+from utils.style import (
+    inject_css,
+    sidebar_nav,
+    render_metric_row,
+    back_to_main,
+    render_comparsion_section,
+)
 
 st.set_page_config(page_title="Классические модели", layout="wide")
 inject_css()
@@ -62,15 +68,20 @@ if metrics_tfidf:
             m = metrics_tfidf[key]
             with col:
                 st.markdown(f"**{name}**")
-                render_metric_row({
-                    "Accuracy": m.get("val_acc", 0),
-                    "F1": m.get("val_f1", 0),
-                })
+                render_metric_row(
+                    {
+                        "Accuracy": m.get("val_acc", 0),
+                        "F1": m.get("val_f1", 0),
+                    }
+                )
 else:
     st.info("Метрики TF-IDF не найдены.")
 
 if os.path.exists("assets/classical_comparsion_tfidf.png"):
-    st.image("assets/classical_comparsion_tfidf.png", caption="Сравнение моделей на TF-IDF признаках")
+    st.image(
+        "assets/classical_comparsion_tfidf.png",
+        caption="Сравнение моделей на TF-IDF признаках",
+    )
 
 # ── Word2Vec ─────────────────────────────────────────────────────────────────
 
@@ -83,9 +94,7 @@ st.markdown(
     "векторов всех его слов."
 )
 
-st.markdown(
-    "Для пары \"заголовок — тело\" вычисляются дополнительные признаки:"
-)
+st.markdown('Для пары "заголовок — тело" вычисляются дополнительные признаки:')
 
 st.markdown("""
 - **Косинусная близость** — насколько схожи вектора заголовка и тела
@@ -112,15 +121,20 @@ if metrics_w2v:
             m = metrics_w2v[key]
             with col:
                 st.markdown(f"**{name}**")
-                render_metric_row({
-                    "Accuracy": m.get("val_accuracy", 0),
-                    "F1": m.get("val_f1", m.get("f1", 0)),
-                })
+                render_metric_row(
+                    {
+                        "Accuracy": m.get("val_accuracy", 0),
+                        "F1": m.get("val_f1", m.get("f1", 0)),
+                    }
+                )
 else:
     st.info("Метрики Word2Vec не найдены.")
 
 if os.path.exists("assets/classical_comparsion_w2v.png"):
-    st.image("assets/classical_comparsion_w2v.png", caption="Сравнение моделей на Word2Vec признаках")
+    st.image(
+        "assets/classical_comparsion_w2v.png",
+        caption="Сравнение моделей на Word2Vec признаках",
+    )
 
 # ── Визуализации ─────────────────────────────────────────────────────────────
 

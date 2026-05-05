@@ -1,8 +1,20 @@
 import os
 import pandas as pd
 import streamlit as st
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix
-from utils.style import inject_css, sidebar_nav, render_metric_row, back_to_main, render_comparsion_section
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    confusion_matrix,
+)
+from utils.style import (
+    inject_css,
+    sidebar_nav,
+    render_metric_row,
+    back_to_main,
+    render_comparsion_section,
+)
 
 st.set_page_config(page_title="DeepSeek API", layout="wide")
 inject_css()
@@ -12,8 +24,8 @@ back_to_main()
 
 # ── Метрики из кэша предсказаний ─────────────────────────────────────────────
 
-cache_path = "models/deepseek/predictions_441_v4.csv"
-fallback_path = "models/deepseek/predictions_441_v3.csv"
+cache_path = "models/deepseek/predictions_441_v5.csv"
+fallback_path = "models/deepseek/predictions_441_v4.csv"
 metrics = None
 cm = None
 n_total = 0
@@ -108,12 +120,14 @@ st.markdown("---")
 st.markdown("## Результаты на тестовой выборке")
 
 if metrics:
-    render_metric_row({
-        "Accuracy": metrics["accuracy"],
-        "F1": metrics["f1"],
-        "Precision": metrics["precision"],
-        "Recall": metrics["recall"],
-    })
+    render_metric_row(
+        {
+            "Accuracy": metrics["accuracy"],
+            "F1": metrics["f1"],
+            "Precision": metrics["precision"],
+            "Recall": metrics["recall"],
+        }
+    )
     st.caption(f"Оценка проведена на hold-out из {n_total} примеров.")
 
     if cm is not None and cm.shape == (2, 2):

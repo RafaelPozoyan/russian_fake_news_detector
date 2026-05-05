@@ -8,7 +8,13 @@ import pandas as pd
 import streamlit as st
 from gensim.models import KeyedVectors
 import nltk
-from utils.style import inject_css, sidebar_nav, render_prediction, render_metric_row, back_to_main
+from utils.style import (
+    inject_css,
+    sidebar_nav,
+    render_prediction,
+    render_metric_row,
+    back_to_main,
+)
 
 st.set_page_config(page_title="Английский детектор", layout="wide")
 inject_css()
@@ -25,6 +31,7 @@ eng_df = pd.read_csv("./data/eng_data")
 def load_stopwords():
     nltk.download("stopwords", quiet=True)
     from nltk.corpus import stopwords
+
     return set(stopwords.words("english"))
 
 
@@ -45,11 +52,24 @@ def preprocess_text(text):
 
 # ── Модели ───────────────────────────────────────────────────────────────────
 
+
 @st.cache_resource
 def load_w2v_eng():
-    kv = KeyedVectors.load("models/w2v_vectors_eng.kv") if os.path.exists("models/w2v_vectors_eng.kv") else None
-    lr = pickle.load(open("models/logisticregression_model_w2v_eng.pkl", "rb")) if os.path.exists("models/logisticregression_model_w2v_eng.pkl") else None
-    rf = pickle.load(open("models/randomforest_model_w2v_eng.pkl", "rb")) if os.path.exists("models/randomforest_model_w2v_eng.pkl") else None
+    kv = (
+        KeyedVectors.load("models/w2v_vectors_eng.kv")
+        if os.path.exists("models/w2v_vectors_eng.kv")
+        else None
+    )
+    lr = (
+        pickle.load(open("models/logisticregression_model_w2v_eng.pkl", "rb"))
+        if os.path.exists("models/logisticregression_model_w2v_eng.pkl")
+        else None
+    )
+    rf = (
+        pickle.load(open("models/randomforest_model_w2v_eng.pkl", "rb"))
+        if os.path.exists("models/randomforest_model_w2v_eng.pkl")
+        else None
+    )
     return kv, lr, rf
 
 
@@ -80,9 +100,14 @@ if os.path.exists("results/metrics/metrics_tfidf_eng.json"):
 
 # ── Вспомогательные функции ──────────────────────────────────────────────────
 
+
 def doc_vector(tokens, kv_model):
     vecs = [kv_model[w] for w in tokens if w in kv_model]
-    return np.vstack(vecs).mean(axis=0) if vecs else np.zeros(kv_model.vector_size, dtype=np.float32)
+    return (
+        np.vstack(vecs).mean(axis=0)
+        if vecs
+        else np.zeros(kv_model.vector_size, dtype=np.float32)
+    )
 
 
 def predict_w2v_eng(headline, body, model):
@@ -92,7 +117,9 @@ def predict_w2v_eng(headline, body, model):
         return None, None
     htoks, btoks = h_clean.split()[:150], b_clean.split()[:150]
     h_vec, b_vec = doc_vector(htoks, w2v_kv), doc_vector(btoks, w2v_kv)
-    cos_sim = float(np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8))
+    cos_sim = float(
+        np.dot(h_vec, b_vec) / max(np.linalg.norm(h_vec) * np.linalg.norm(b_vec), 1e-8)
+    )
     feats = np.hstack([h_vec, b_vec, [cos_sim]]).reshape(1, -1)
     prob = model.predict_proba(feats)[0]
     pred = int(model.predict(feats)[0])
@@ -120,12 +147,15 @@ st.markdown(
 use_translate = False
 try:
     from deep_translator import GoogleTranslator
+
     HAS_TRANSLATOR = True
 except ImportError:
     HAS_TRANSLATOR = False
 
 if HAS_TRANSLATOR:
-    use_translate = st.checkbox("Перевести с русского на английский перед проверкой", value=False)
+    use_translate = st.checkbox(
+        "Перевести с русского на английский перед проверкой", value=False
+    )
 
 if "eng_headline" not in st.session_state:
     st.session_state.eng_headline = ""
@@ -144,16 +174,27 @@ def clear_eng():
     st.session_state.eng_body = ""
 
 
-headline = st.text_input("Заголовок", key="eng_headline", placeholder="Введите заголовок на английском")
-body_text = st.text_area("Текст статьи", key="eng_body", height=200, placeholder="Введите текст статьи на английском")
+headline = st.text_input(
+    "Заголовок", key="eng_headline", placeholder="Введите заголовок на английском"
+)
+body_text = st.text_area(
+    "Текст статьи",
+    key="eng_body",
+    height=200,
+    placeholder="Введите текст статьи на английском",
+)
 
 cb1, cb2, cb3 = st.columns([1, 1, 2])
 with cb1:
-    st.button("Случайная новость", on_click=pick_eng, key="eng_pick", use_container_width=True)
+    st.button(
+        "Случайная новость", on_click=pick_eng, key="eng_pick", use_container_width=True
+    )
 with cb2:
     st.button("Очистить", on_click=clear_eng, key="eng_clear", use_container_width=True)
 with cb3:
-    check = st.button("Проверить", type="primary", key="eng_check", use_container_width=True)
+    check = st.button(
+        "Проверить", type="primary", key="eng_check", use_container_width=True
+    )
 
 if check:
     if not headline.strip() or not body_text.strip():
@@ -175,7 +216,10 @@ if check:
     if w2v_kv and w2v_lr and w2v_rf:
         st.markdown("#### Word2Vec")
         c1, c2 = st.columns(2)
-        for col, model, name in [(c1, w2v_lr, "Logistic Regression"), (c2, w2v_rf, "Random Forest")]:
+        for col, model, name in [
+            (c1, w2v_lr, "Logistic Regression"),
+            (c2, w2v_rf, "Random Forest"),
+        ]:
             with col:
                 pred, conf = predict_w2v_eng(h_input, b_input, model)
                 if pred is not None:
@@ -203,8 +247,14 @@ if check:
         total = len(all_votes)
         fake_count = total - real_count
         if real_count > fake_count:
-            st.success(f"**Достоверная новость** — {real_count} из {total} моделей считают новость настоящей")
+            st.success(
+                f"**Достоверная новость** — {real_count} из {total} моделей считают новость настоящей"
+            )
         elif fake_count > real_count:
-            st.error(f"**Фейк** — {fake_count} из {total} моделей считают новость фейковой")
+            st.error(
+                f"**Фейк** — {fake_count} из {total} моделей считают новость фейковой"
+            )
         else:
-            st.warning(f"**Мнения разделились** — {real_count} за, {fake_count} против из {total}")
+            st.warning(
+                f"**Мнения разделились** — {real_count} за, {fake_count} против из {total}"
+            )
