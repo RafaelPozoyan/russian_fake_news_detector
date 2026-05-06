@@ -22,7 +22,7 @@ sidebar_nav()
 
 back_to_main()
 
-# ── Данные и стоп-слова ──────────────────────────────────────────────────────
+# Данные и стоп-слова
 
 eng_df = pd.read_csv("./data/eng_data")
 
@@ -50,7 +50,7 @@ def preprocess_text(text):
     return " ".join(w for w in t.split() if w not in STOPWORDS and len(w) > 2)
 
 
-# ── Модели ───────────────────────────────────────────────────────────────────
+# Модели
 
 
 @st.cache_resource
@@ -96,9 +96,6 @@ if os.path.exists("results/metrics/metrics_w2v_eng.json"):
 if os.path.exists("results/metrics/metrics_tfidf_eng.json"):
     with open("results/metrics/metrics_tfidf_eng.json", encoding="utf-8") as f:
         metrics_tfidf = json.load(f)
-
-
-# ── Вспомогательные функции ──────────────────────────────────────────────────
 
 
 def doc_vector(tokens, kv_model):

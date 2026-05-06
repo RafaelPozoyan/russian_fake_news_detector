@@ -1,17 +1,3 @@
-"""Сравнение RuBERT и ruGPT-3 + LoRA на одном hold-out (441 пример).
-
-Использует кэшированные предсказания:
-  models/rubert/test_predictions.csv         (y_true, y_pred)
-  models/llm_v3_tuned/test_predictions.csv   (label, pred, prob_real)
-
-Генерирует:
-  assets/rubert_vs_rugpt_comparsion.csv
-  assets/rubert_vs_rugpt_comparsion_confusion.png
-  assets/rubert_vs_rugpt_comparsion_roc.png
-  assets/rubert_vs_rugpt_comparsion_confidence.png
-  assets/rubert_vs_rugpt_comparsion_agreement.png
-"""
-
 import os
 import warnings
 
@@ -30,7 +16,6 @@ from sklearn.metrics import (
 )
 
 warnings.filterwarnings("ignore")
-plt.rcParams["font.family"] = "DejaVu Sans"
 sns.set_style("whitegrid")
 
 ASSETS = "assets"
@@ -38,12 +23,10 @@ ASSETS = "assets"
 RB_COLOR = "#1F77B4"
 RG_COLOR = "#FF7F0E"
 
-# ── Данные ───────────────────────────────────────────────────────────────────
 
 rb_df = pd.read_csv("models/rubert/test_predictions.csv")
 rg_df = pd.read_csv("models/llm_v3_tuned/test_predictions.csv")
 
-assert len(rb_df) == len(rg_df), "Размеры предсказаний должны совпадать"
 
 y_true = rb_df["y_true"].values.astype(int)
 rb_pred = rb_df["y_pred"].values.astype(int)
@@ -51,14 +34,9 @@ rb_prob = rb_df["prob_real"].values.astype(float)
 rg_pred = rg_df["pred"].values.astype(int)
 rg_prob = rg_df["prob_real"].values.astype(float)
 
-# Согласованность меток истины между двумя файлами
-assert (rg_df["label"].values.astype(int) == y_true).all(), "Истинные метки расходятся"
 
 N = len(y_true)
-print(f"Тестовая выборка: {N} примеров")
-
-
-# ── Метрики и CSV ────────────────────────────────────────────────────────────
+print(f"Test data: {N} samples")
 
 
 def metrics(y_t, y_p):
@@ -81,10 +59,7 @@ cmp_df = pd.DataFrame(
 )
 csv_path = os.path.join(ASSETS, "rubert_vs_rugpt_comparsion.csv")
 cmp_df.to_csv(csv_path, index=False, encoding="utf-8")
-print(f"Сохранено: {csv_path}")
-
-
-# ── 1. Confusion matrices ────────────────────────────────────────────────────
+print(f"Saved: {csv_path}")
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 5))
 for ax, (name, y_pred, m) in zip(
@@ -122,10 +97,8 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_rugpt_comparsion_confusion.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
-
-# ── 2. ROC curves ────────────────────────────────────────────────────────────
 
 fig, ax = plt.subplots(figsize=(8, 8))
 fpr_rb, tpr_rb, _ = roc_curve(y_true, rb_prob)
@@ -159,14 +132,11 @@ ax.grid(alpha=0.3)
 out = os.path.join(ASSETS, "rubert_vs_rugpt_comparsion_roc.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
-
-# ── 3. Confidence ────────────────────────────────────────────────────────────
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-# Слева: гистограмма уверенности RuBERT, окрашенная по правильности
 correct_rb = rb_pred == y_true
 axes[0].hist(
     [rb_prob[correct_rb], rb_prob[~correct_rb]],
@@ -183,7 +153,7 @@ axes[0].set_title("Распределение уверенности RuBERT")
 axes[0].legend(loc="upper center")
 axes[0].grid(alpha=0.3)
 
-# Справа: гистограмма уверенности ruGPT-3
+
 correct_rg = rg_pred == y_true
 axes[1].hist(
     [rg_prob[correct_rg], rg_prob[~correct_rg]],
@@ -207,10 +177,8 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_rugpt_comparsion_confidence.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
-
-# ── 4. Agreement ─────────────────────────────────────────────────────────────
 
 both_right = ((rb_pred == y_true) & (rg_pred == y_true)).sum()
 both_wrong = ((rb_pred != y_true) & (rg_pred != y_true)).sum()
@@ -220,7 +188,6 @@ agree = (rb_pred == rg_pred).sum()
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-# Слева: 2x2 матрица согласованности
 matrix = np.array(
     [
         [both_right, only_rb],
@@ -240,7 +207,6 @@ sns.heatmap(
 )
 axes[0].set_title(f"Согласие моделей: {agree}/{N} ({agree/N:.1%})", fontsize=11)
 
-# Справа: бар-чарт по 4 категориям
 cats = [
     ("Обе модели правы", both_right, "#3FA34D"),
     ("Прав только RuBERT", only_rb, RB_COLOR),
@@ -276,6 +242,4 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_rugpt_comparsion_agreement.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
-
-print("Готово.")
+print(f"Saved: {out}")

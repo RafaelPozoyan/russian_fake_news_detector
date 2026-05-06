@@ -22,9 +22,7 @@ sidebar_nav()
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# ═════════════════════════════════════════════════════════════════════════════
 # ЗАГРУЗКА ДАННЫХ
-# ═════════════════════════════════════════════════════════════════════════════
 
 test_bodies = pd.read_csv("./data/test_bodies.csv")
 test_stances = pd.read_csv("./data/test_stances_unlebeledb.csv")
@@ -54,9 +52,9 @@ def preprocess_text(text):
     return " ".join(w for w in t.split() if w not in STOPWORDS and len(w) > 2)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # МОДЕЛИ: Word2Vec
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 
 @st.cache_resource
@@ -121,9 +119,9 @@ def predict_w2v(headline, body, model):
     return 0, max(prob[0], 0.5)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # МОДЕЛИ: TF-IDF
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 
 @st.cache_resource
@@ -150,9 +148,9 @@ def predict_tfidf(headline, body, model):
     return pred, float(prob[pred])
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # МОДЕЛИ: RuBERT
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 RUBERT_DIR = "models/rubert/best_model"
 
@@ -188,9 +186,9 @@ def predict_rubert(headline, body):
     return pred, float(probs[pred])
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # МОДЕЛИ: ruGPT-3 + LoRA (тонко настроенная конфигурация)
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 RUGPT_LORA_DIR = "models/llm_v3_tuned/lora_adapter"
 GPT_BASE = "ai-forever/rugpt3small_based_on_gpt2"
@@ -236,9 +234,9 @@ def predict_rugpt_lora(headline, body):
     return pred, float(probs[pred])
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # МОДЕЛИ: DeepSeek API
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 DEEPSEEK_MODEL = "deepseek-chat"
@@ -321,9 +319,9 @@ def predict_deepseek(headline, body):
     return parse_deepseek_response(r.choices[0].message.content)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # ИНТЕРФЕЙС
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 st.markdown("# Детектор фейковых новостей")
 st.markdown(
@@ -363,9 +361,9 @@ with c3:
     check = st.button("Проверить", type="primary", use_container_width=True)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # РЕЗУЛЬТАТЫ
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 if check:
     if not headline.strip() or not body.strip():
@@ -466,9 +464,9 @@ if check:
         )
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 # ССЫЛКИ НА ПОДХОДЫ
-# ═════════════════════════════════════════════════════════════════════════════
+ 
 
 st.markdown("---")
 st.markdown("#### Подробнее о подходах")

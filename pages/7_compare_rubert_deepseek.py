@@ -35,7 +35,6 @@ st.markdown(
     "сводится к подбору информативных примеров для контекста."
 )
 
-# ── Метрики ──────────────────────────────────────────────────────────────────
 
 rows = []
 
@@ -53,7 +52,6 @@ if rb:
         }
     )
 
-# DeepSeek — рассчитываем метрики из кэша предсказаний
 deepseek_metrics = None
 deepseek_cm = None
 deepseek_n = 0
@@ -96,7 +94,6 @@ if rows:
 else:
     st.info("Метрики не найдены.")
 
-# ── Анализ ошибок ────────────────────────────────────────────────────────────
 
 rb_preds_path = "models/rubert/test_predictions.csv"
 ds_preds_path = "models/deepseek/predictions_441_v5.csv"
@@ -110,7 +107,6 @@ if os.path.exists(rb_preds_path) and os.path.exists(ds_preds_path):
     ds_df = pd.read_csv(ds_preds_path)
 
     if len(rb_df) == len(ds_df):
-        # Колонки могут различаться
         true_rb = next(
             (c for c in rb_df.columns if "true" in c.lower()), rb_df.columns[0]
         )
@@ -159,7 +155,6 @@ if os.path.exists(rb_preds_path) and os.path.exists(ds_preds_path):
             hide_index=True,
         )
 
-# ── Графики ──────────────────────────────────────────────────────────────────
 
 img_paths = [
     (
@@ -186,7 +181,6 @@ for path, caption in img_paths:
             images_shown = True
         st.image(path, caption=caption)
 
-# ── Выводы ───────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Выводы")

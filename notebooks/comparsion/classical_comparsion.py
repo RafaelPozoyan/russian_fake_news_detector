@@ -66,7 +66,6 @@ bodies = test_df["body_clean"].astype(str).tolist()
 print(f"Тестовая выборка: {len(test_df)} примеров")
 
 
-print("TF-IDF инференс")
 vec = pickle.load(open("models/tfidf_vectorizer_tf.pkl", "rb"))
 lr_tf = pickle.load(open("models/logistic_regression_model_tf.pkl", "rb"))
 nb_tf = pickle.load(open("models/naive_bayes_model_tf.pkl", "rb"))
@@ -83,7 +82,6 @@ tfidf_models = {
 }
 
 
-print("Word2Vec инференс")
 kv = KeyedVectors.load("models/w2v_vectors.kv")
 lr_w2v = pickle.load(open("models/logisticregression_model.pkl", "rb"))
 rf_w2v = pickle.load(open("models/randomforest_model.pkl", "rb"))
@@ -231,18 +229,14 @@ def plot_group(models, title, out_path):
     print(f"Сохранено: {out_path}")
 
 
-print("Отрисовка TF-IDF")
 plot_group(
     tfidf_models,
     "Сравнение классических моделей на TF-IDF признаках",
     os.path.join(ASSETS, "classical_comparsion_tfidf.png"),
 )
 
-print("Отрисовка Word2Vec")
 plot_group(
     w2v_models,
     "Сравнение классических моделей на Word2Vec признаках",
     os.path.join(ASSETS, "classical_comparsion_w2v.png"),
 )
-
-print("Готово")

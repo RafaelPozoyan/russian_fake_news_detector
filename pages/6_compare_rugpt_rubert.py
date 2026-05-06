@@ -31,7 +31,6 @@ st.markdown(
     "переобучению на небольшом датасете."
 )
 
-# ── Метрики ──────────────────────────────────────────────────────────────────
 
 rows = []
 
@@ -77,7 +76,6 @@ if rows:
 else:
     st.info("Метрики не найдены — обучите модели через соответствующие ноутбуки.")
 
-# ── Сравнение предсказаний ───────────────────────────────────────────────────
 
 rb_preds_path = "models/rubert/test_predictions.csv"
 rugpt_preds_path = "models/llm_v3_tuned/test_predictions.csv"
@@ -148,7 +146,6 @@ if os.path.exists(rb_preds_path) and os.path.exists(rugpt_preds_path):
                 pd.DataFrame(agreement_data), use_container_width=True, hide_index=True
             )
 
-# ── Графики ──────────────────────────────────────────────────────────────────
 
 img_paths = [
     ("assets/rubert_vs_rugpt_comparsion.csv", None),
@@ -172,7 +169,6 @@ for path, caption in img_paths:
             images_shown = True
         st.image(path, caption=caption)
 
-# ── Выводы ───────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Выводы")

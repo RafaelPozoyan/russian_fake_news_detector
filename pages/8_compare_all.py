@@ -27,11 +27,10 @@ st.markdown(
     "разделах сайта."
 )
 
-# ── Сбор метрик ──────────────────────────────────────────────────────────────
 
 rows = []
 
-# Классические TF-IDF
+# TF-IDF
 m_tfidf = load_json("results/metrics/metrics_tfidf_tuned.json")
 for name, key in [
     ("LR + TF-IDF", "logistic_regression"),
@@ -122,7 +121,6 @@ for path in (
             )
             break
 
-# ── Таблица ──────────────────────────────────────────────────────────────────
 
 if rows:
     st.markdown("---")
@@ -146,7 +144,6 @@ if rows:
 else:
     st.info("Метрики не найдены. Запустите соответствующие ноутбуки.")
 
-# ── Графики ──────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Визуализация")
@@ -164,7 +161,6 @@ for path, caption in img_paths:
     if os.path.exists(path):
         st.image(path, caption=caption)
 
-# ── Выводы ───────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Итоги")

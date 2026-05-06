@@ -1,14 +1,3 @@
-"""Второй проход DeepSeek по тем 8 примерам, на которых v4 ошиблась.
-
-Цель — поднять accuracy на 1–2 примера. Делаем это так:
-- увеличенное число голосов (7 вместо 3)
-- разнообразные температуры (0.0, 0.3, 0.3, 0.5, 0.5, 0.7, 0.7)
-- усиленный системный промпт с явными примерами Panorama-style сатиры
-- та же 24-shot retrieval-выборка из train
-
-Результат: cписок предсказаний v5 = v4 с оверрайдами по флипнувшимся индексам.
-Сохраняем в models/deepseek/predictions_441_v5.csv.
-"""
 import os
 import json
 import re
@@ -40,7 +29,6 @@ DEEPSEEK_MODEL = "deepseek-chat"
 ds_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 
-# Тот же сплит, что в final_comparsion.ipynb
 df = pd.read_csv(DATA_PATH)
 df = df[["headline_clean", "body_clean", "combined_text", "label"]].dropna()
 df["headline_clean"] = df["headline_clean"].astype(str).str.strip()
@@ -84,9 +72,6 @@ def retrieve_fewshot(test_text, k=K_RETRIEVE):
     return examples
 
 
-# Усиленный системный промпт. Явно указываем ловушки, на которых v4 ошибалась:
-# (а) фейки часто маскируются под официальные новости с вымышленными именами/местами;
-# (б) реальные новости иногда выглядят абсурдно из-за военного контекста.
 DS_SYSTEM_PROMPT = (
     "You classify Russian-language news as REAL (label=1) or FAKE (label=0). "
     "Texts are lemmatized (no punctuation, no headlines, single line). "

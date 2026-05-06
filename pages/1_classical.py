@@ -15,7 +15,6 @@ sidebar_nav()
 
 back_to_main()
 
-# ── Загрузка метрик ──────────────────────────────────────────────────────────
 
 metrics_tfidf = {}
 metrics_w2v = {}
@@ -26,7 +25,6 @@ if os.path.exists("results/metrics/metrics_w2v.json"):
     with open("results/metrics/metrics_w2v.json", encoding="utf-8") as f:
         metrics_w2v = json.load(f)
 
-# ── Заголовок ────────────────────────────────────────────────────────────────
 
 st.markdown("# Классические модели машинного обучения")
 st.markdown(
@@ -34,7 +32,6 @@ st.markdown(
     "На их основе обучены три классификатора: логистическая регрессия, наивный Байес и случайный лес."
 )
 
-# ── TF-IDF ───────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## TF-IDF")
@@ -74,8 +71,6 @@ if metrics_tfidf:
                         "F1": m.get("val_f1", 0),
                     }
                 )
-else:
-    st.info("Метрики TF-IDF не найдены.")
 
 if os.path.exists("assets/classical_comparsion_tfidf.png"):
     st.image(
@@ -83,7 +78,6 @@ if os.path.exists("assets/classical_comparsion_tfidf.png"):
         caption="Сравнение моделей на TF-IDF признаках",
     )
 
-# ── Word2Vec ─────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Word2Vec")
@@ -127,8 +121,6 @@ if metrics_w2v:
                         "F1": m.get("val_f1", m.get("f1", 0)),
                     }
                 )
-else:
-    st.info("Метрики Word2Vec не найдены.")
 
 if os.path.exists("assets/classical_comparsion_w2v.png"):
     st.image(
@@ -136,7 +128,6 @@ if os.path.exists("assets/classical_comparsion_w2v.png"):
         caption="Сравнение моделей на Word2Vec признаках",
     )
 
-# ── Визуализации ─────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Анализ данных")
@@ -149,7 +140,6 @@ with c2:
     if os.path.exists("assets/wordcloud_vectorized.png"):
         st.image("assets/wordcloud_vectorized.png", caption="Облако слов")
 
-# ── Выводы ───────────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.markdown("## Выводы")
@@ -160,6 +150,5 @@ st.markdown(
     "Бизнес-правила поверх Word2Vec помогают отсеивать явные несоответствия."
 )
 
-# ── Сравнение с другими подходами ────────────────────────────────────────────
 
 render_comparsion_section()

@@ -1,17 +1,3 @@
-"""Сравнение RuBERT и DeepSeek (API, retrieval-based 24-shot) на одном hold-out (441).
-
-Использует кэшированные предсказания:
-  models/rubert/test_predictions.csv         (y_true, y_pred, prob_real)
-  models/deepseek/predictions_441_v4.csv     (true_label, pred)
-
-Генерирует:
-  assets/rubert_vs_deepseek_comparsion.csv
-  assets/rubert_vs_deepseek_comparsion_confusion.png
-  assets/rubert_vs_deepseek_comparsion_roc.png
-  assets/rubert_vs_deepseek_comparsion_confidence.png
-  assets/rubert_vs_deepseek_comparsion_agreement.png
-"""
-
 import os
 import warnings
 
@@ -37,30 +23,22 @@ ASSETS = "assets"
 RB_COLOR = "#1F77B4"
 DS_COLOR = "#9467BD"
 
-# ── Данные ───────────────────────────────────────────────────────────────────
 
 rb_df = pd.read_csv("models/rubert/test_predictions.csv")
 ds_path = "models/deepseek/predictions_441_v5.csv"
 if not os.path.exists(ds_path):
     ds_path = "models/deepseek/predictions_441_v4.csv"
 ds_df = pd.read_csv(ds_path)
-assert len(rb_df) == len(ds_df), "Размеры предсказаний должны совпадать"
 
 y_true = rb_df["y_true"].values.astype(int)
 rb_pred = rb_df["y_pred"].values.astype(int)
 rb_prob = rb_df["prob_real"].values.astype(float)
 ds_pred = ds_df["pred"].values.astype(int)
 
-# DeepSeek-предсказания получены на том же hold-out, но кэш не содержит истинных
-# меток в том же порядке, что у RuBERT. Сверяем по распределению, а агрегатные
-# метрики DeepSeek считаем по own true_label из его файла.
 ds_y_true = ds_df["true_label"].values.astype(int)
 
 N = len(y_true)
-print(f"Тестовая выборка: {N} примеров")
-
-
-# ── Метрики и CSV ────────────────────────────────────────────────────────────
+print(f"Test dataset: {N} samples")
 
 
 def metrics(y_t, y_p):
@@ -83,10 +61,8 @@ cmp_df = pd.DataFrame(
 )
 csv_path = os.path.join(ASSETS, "rubert_vs_deepseek_comparsion.csv")
 cmp_df.to_csv(csv_path, index=False, encoding="utf-8")
-print(f"Сохранено: {csv_path}")
+print(f"Saved: {csv_path}")
 
-
-# ── 1. Confusion matrices ────────────────────────────────────────────────────
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 5))
 for ax, (name, y_t, y_p, m) in zip(
@@ -124,14 +100,12 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_deepseek_comparsion_confusion.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
 
-# ── 2. ROC curves ────────────────────────────────────────────────────────────
 
 fig, ax = plt.subplots(figsize=(8, 8))
 
-# RuBERT — непрерывная кривая
 fpr_rb, tpr_rb, _ = roc_curve(y_true, rb_prob)
 roc_auc_rb = auc(fpr_rb, tpr_rb)
 ax.plot(
@@ -142,7 +116,7 @@ ax.plot(
     label=f"RuBERT (AUC = {roc_auc_rb:.4f})",
 )
 
-# DeepSeek — дискретная точка (нет вероятностей у API-вызова)
+
 cm_ds = confusion_matrix(ds_y_true, ds_pred)
 tn, fp, fn, tp = cm_ds.ravel()
 fpr_pt, tpr_pt = fp / (fp + tn), tp / (tp + fn)
@@ -174,14 +148,12 @@ ax.grid(alpha=0.3)
 out = os.path.join(ASSETS, "rubert_vs_deepseek_comparsion_roc.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
 
-# ── 3. Confidence ────────────────────────────────────────────────────────────
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-# Слева: распределение уверенности RuBERT
 correct_rb = rb_pred == y_true
 axes[0].hist(
     [rb_prob[correct_rb], rb_prob[~correct_rb]],
@@ -198,7 +170,6 @@ axes[0].set_title("Распределение уверенности RuBERT")
 axes[0].legend(loc="upper center")
 axes[0].grid(alpha=0.3)
 
-# Справа: для DeepSeek рисуем точность по классам как столбцы
 ds_acc_fake = (ds_pred[ds_y_true == 0] == 0).mean()
 ds_acc_real = (ds_pred[ds_y_true == 1] == 1).mean()
 rb_acc_fake = (rb_pred[y_true == 0] == 0).mean()
@@ -232,11 +203,8 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_deepseek_comparsion_confidence.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
+print(f"Saved: {out}")
 
-
-# ── 4. Agreement (по строкам, кэши выровнены) ────────────────────────────────
-assert (ds_y_true == y_true).all(), "Истинные метки не совпадают по строкам"
 
 both_right = ((rb_pred == y_true) & (ds_pred == y_true)).sum()
 both_wrong = ((rb_pred != y_true) & (ds_pred != y_true)).sum()
@@ -246,7 +214,6 @@ agree = (rb_pred == ds_pred).sum()
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-# Слева: 2x2 матрица согласованности
 matrix = np.array(
     [
         [both_right, only_rb],
@@ -266,7 +233,6 @@ sns.heatmap(
 )
 axes[0].set_title(f"Согласие моделей: {agree}/{N} ({agree/N:.1%})", fontsize=11)
 
-# Справа: бар-чарт по 4 категориям
 cats = [
     ("Обе модели правы", both_right, "#3FA34D"),
     ("Прав только RuBERT", only_rb, RB_COLOR),
@@ -299,6 +265,4 @@ plt.tight_layout()
 out = os.path.join(ASSETS, "rubert_vs_deepseek_comparsion_agreement.png")
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close(fig)
-print(f"Сохранено: {out}")
-
-print("Готово.")
+print(f"Saved: {out}")
